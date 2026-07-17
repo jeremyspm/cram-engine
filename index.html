@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0e1420"/>
+<title>Cram Engine — Example Pack</title>
+<style>
+:root{
+  --bg:#0e1420; --bg2:#141c2b; --card:#182133; --card2:#1e2941;
+  --line:#27324a; --line2:#33405c;
+  --tx:#e8eef7; --tx2:#9fb0c8; --tx3:#6d7f9c;
+  --acc:#4f9dff; --acc2:#2f6fd0;
+  --good:#39d98a; --hard:#ffce54; --miss:#ff6b6b;
+  --gGood:#123a2a; --gHard:#3a3413; --gMiss:#3a1a1a;
+  --shadow:0 10px 40px rgba(0,0,0,.45);
+  --r:16px; --maxw:760px;
+}
+html[data-theme="light"]{
+  --bg:#eef2f8; --bg2:#e3e9f3; --card:#ffffff; --card2:#f4f7fc;
+  --line:#dbe3ef; --line2:#c7d3e6;
+  --tx:#16202f; --tx2:#4a5a72; --tx3:#7d8ca5;
+  --acc:#1f6fe0; --acc2:#1657b8;
+  --good:#128a55; --hard:#a9791a; --miss:#c53b3b;
+  --gGood:#dcf7ea; --gHard:#faf0d2; --gMiss:#fbe0e0;
+  --shadow:0 8px 30px rgba(30,50,90,.14);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+html,body{margin:0;height:100%;overscroll-behavior-y:none}
+body{background:linear-gradient(180deg,var(--bg),var(--bg2));color:var(--tx);
+  font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;min-height:100%;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:14px 16px 120px}
+button{font-family:inherit;cursor:pointer;border:none;color:inherit;background:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none}
+.hidden{display:none !important}
+b{font-variant-numeric:tabular-nums}
+header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.15;margin-right:auto}
+.brand b{font-size:15px}
+.brand span{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1.2px}
+.iconbtn{width:38px;height:38px;border-radius:10px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--tx2);transition:.15s}
+.iconbtn:hover{border-color:var(--line2);color:var(--tx)}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{padding:7px 11px;border-radius:8px;font-size:12.5px;color:var(--tx2);font-weight:600;white-space:nowrap;transition:.12s}
+.seg button.on{background:var(--acc);color:#fff}
+.seg button:not(.on):hover{color:var(--tx);background:var(--card2)}
+.controls{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.chip{padding:7px 11px;border-radius:20px;background:var(--card);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--tx2);transition:.12s}
+.chip:hover{border-color:var(--line2);color:var(--tx)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:22px 22px 20px;position:relative;animation:pop .28s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+.cmeta{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tag{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--card2);border:1px solid var(--line2);color:var(--tx2)}
+.tag.acc{background:rgba(79,157,255,.14);color:var(--acc);border-color:rgba(79,157,255,.3)}
+.tag.right{margin-left:auto;color:var(--tx3);border-color:var(--line)}
+.q{font-size:19px;font-weight:600;line-height:1.5;margin:2px 0 4px}
+.marks{font-size:12.5px;color:var(--tx3);margin:4px 0 0}
+.answer{margin-top:16px;border-top:1px dashed var(--line2);padding-top:16px;animation:pop .22s ease}
+.answer .lab{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);margin-bottom:8px}
+.answer .txt{font-size:16px;line-height:1.6}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.opt{display:flex;gap:10px;align-items:flex-start;text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:14.5px;line-height:1.45;transition:.15s;width:100%}
+.opt:hover{border-color:var(--acc)}
+.opt .k{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--bg2);border:1px solid var(--line2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--tx2)}
+.opt.right{background:var(--gGood);border-color:rgba(57,217,138,.5)}
+.opt.right .k{background:var(--good);color:#04120b;border-color:var(--good)}
+.opt.wrong{background:var(--gMiss);border-color:rgba(255,107,107,.5)}
+.opt.wrong .k{background:var(--miss);color:#fff;border-color:var(--miss)}
+.opt.picked{outline:2px solid var(--acc)}
+.opt:disabled{cursor:default}
+.why{margin-top:12px;padding:11px 13px;border-radius:10px;background:var(--card2);border:1px solid var(--line);font-size:13.5px;color:var(--tx2);line-height:1.5}
+.why b{color:var(--acc)}
+.points{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.points li{display:flex;gap:10px;align-items:flex-start;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14.5px;line-height:1.45;cursor:pointer;transition:.15s}
+.points li .n{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:var(--bg2);border:1px solid var(--line2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--tx2);margin-top:1px}
+.points li.got{background:var(--gGood);border-color:rgba(57,217,138,.4)}
+.points li.got .n{background:var(--good);color:#04120b;border-color:var(--good)}
+.hinttxt{font-size:12.5px;color:var(--tx3);margin-top:10px;font-style:italic}
+.btnrow{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap}
+.btn{padding:13px 20px;border-radius:12px;font-size:14.5px;font-weight:800;letter-spacing:.3px;transition:.12s;flex:1}
+.btn.primary{background:var(--acc);color:#fff}
+.btn.primary:hover{background:var(--acc2)}
+.btn.ghost{background:var(--card2);border:1px solid var(--line2);color:var(--tx2)}
+.btn.ghost:hover{color:var(--tx);border-color:var(--acc)}
+.rate{display:flex;gap:8px;margin-top:16px}
+.rate button{flex:1;padding:12px 6px;border-radius:11px;font-weight:800;font-size:13px;border:1px solid var(--line2);background:var(--card2);transition:.12s}
+.rate .r1:hover{background:var(--gMiss);border-color:var(--miss);color:var(--miss)}
+.rate .r2:hover{background:var(--gHard);border-color:var(--hard);color:var(--hard)}
+.rate .r3:hover{background:var(--gGood);border-color:var(--good);color:var(--good)}
+.rate .r4:hover{background:rgba(79,157,255,.15);border-color:var(--acc);color:var(--acc)}
+.topbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:13px;color:var(--tx2);flex-wrap:wrap}
+.topbar .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;background:var(--card);border:1px solid var(--line);font-weight:700}
+.tprog{height:8px;border-radius:6px;background:var(--card2);overflow:hidden;margin-bottom:14px}
+.tprog i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .3s}
+.timer{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.timer.low{color:var(--miss)}
+.setup h3{margin:0 0 4px;font-size:18px}
+.setup p{margin:0 0 14px;color:var(--tx2);font-size:13.5px}
+.bigstart{width:100%;margin-top:8px;padding:15px;border-radius:12px;color:#fff;font-size:16px;font-weight:900;letter-spacing:.5px;background:linear-gradient(160deg,var(--acc),var(--acc2));box-shadow:0 8px 24px rgba(79,157,255,.35)}
+.bigstart:hover{filter:brightness(1.1)}
+.result-hero{border-radius:var(--r);padding:26px 20px;text-align:center;margin-bottom:14px;border:1px solid var(--line);animation:pop .3s ease}
+.result-hero.pass{background:linear-gradient(160deg,rgba(57,217,138,.16),rgba(57,217,138,.04));border-color:rgba(57,217,138,.45)}
+.result-hero.fail{background:linear-gradient(160deg,rgba(255,107,107,.16),rgba(255,107,107,.04));border-color:rgba(255,107,107,.45)}
+.result-hero .big{font-size:40px;font-weight:900;letter-spacing:-1px}
+.result-hero.pass .big{color:var(--good)}
+.result-hero.fail .big{color:var(--miss)}
+.result-hero .sub{font-size:14px;color:var(--tx2);margin-top:4px}
+.rev{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:9px;overflow:hidden}
+.rev .rhead{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;cursor:pointer;font-size:14px;line-height:1.45}
+.rev .rhead .ic{flex:0 0 auto;margin-top:1px}
+.rev .rhead .qq{flex:1;color:var(--tx2)}
+.rev .rbody{padding:0 14px 13px}
+.search input{width:100%;background:var(--card);border:1.5px solid var(--line2);border-radius:12px;padding:13px 15px;color:var(--tx);font:inherit;outline:none}
+.search input:focus{border-color:var(--acc)}
+.sres{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-top:9px;font-size:14px;line-height:1.5}
+.sres .st{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--acc);margin-bottom:3px}
+.sres .sa{color:var(--tx2);margin-top:5px;font-size:13.5px}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+.stat .n{font-size:24px;font-weight:800}
+.stat .l{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+.catstat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.catstat .top{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin-bottom:7px}
+.catstat .top .m{margin-left:auto;font-size:12px;font-weight:800;color:var(--tx3)}
+.catstat .bar{height:7px;border-radius:5px;background:var(--card2);overflow:hidden}
+.catstat .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.catstat .sub{font-size:12px;color:var(--tx3);margin-top:5px}
+.histrow{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-size:13px;margin-bottom:7px;color:var(--tx2)}
+.histrow .sc{font-weight:800;font-size:14px;color:var(--tx)}
+.histrow .pf{margin-left:auto;font-weight:800;font-size:11.5px}
+.histrow .pf.p{color:var(--good)} .histrow .pf.f{color:var(--miss)}
+h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);margin:20px 0 9px}
+.danger{color:var(--miss);border-color:rgba(255,107,107,.4) !important}
+.packwarn{background:var(--gHard);border:1px solid rgba(255,206,84,.5);border-radius:11px;padding:11px 14px;font-size:13px;margin-bottom:12px;color:var(--tx)}
+.empty{color:var(--tx3);text-align:center;padding:40px 10px;font-size:14px}
+.foot{margin-top:26px;text-align:center;font-size:11.5px;color:var(--tx3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><b id="hTitle">Cram Engine</b><span id="hSub">content pack</span></div>
+    <button class="iconbtn" id="btnTts" title="Read aloud">🔊</button>
+    <button class="iconbtn" id="btnTheme" title="Theme">◐</button>
+  </header>
+  <div id="packwarn"></div>
+  <div class="controls">
+    <div class="seg" id="nav">
+      <button data-v="learn" class="on">Learn</button>
+      <button data-v="mcq">MCQ</button>
+      <button data-v="saq">Marked drill</button>
+      <button data-v="exam">Exam sim</button>
+      <button data-v="search">Search</button>
+      <button data-v="stats">Stats</button>
+    </div>
+  </div>
+  <div id="view"></div>
+  <div class="foot">100% offline · progress saved on this device</div>
+</div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║  CONTENT PACK — replace everything between START and END to      ║
+   ║  make a new cram tool. Schema: see README.md / PACK-SCHEMA.md    ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+/* ===== CONTENT PACK START ===== */
+const PACK = {
+  id: 'example-vitals',              // UNIQUE per tool — namespaces saved progress
+  title: 'Vital Signs — Example Pack',
+  subtitle: 'Cram Engine demo',
+  exam: { mcq: 4, saq: 1, minutes: 10, pass: 80 },   // exam-sim composition
+  topics: [
+    { id:'obs',  name:'Observations', icon:'🩺' },
+    { id:'resp', name:'Respiratory',  icon:'🫁' },
+  ],
+  cards: [
+    // ---- flashcards (type:'flash') ----
+    { type:'flash', topic:'obs', q:'Normal adult resting heart rate range?', a:'<b>60–100 beats per minute.</b> Below 60 = bradycardia, above 100 = tachycardia.' },
+    { type:'flash', topic:'obs', q:'Normal adult oral temperature range?', a:'Approximately <b>36.5–37.5 °C</b>. Above ~38.0 °C is generally considered febrile.' },
+    { type:'flash', topic:'resp', q:'Normal adult respiratory rate at rest?', a:'<b>12–20 breaths per minute.</b> RR is the most sensitive early indicator of deterioration.' },
+    { type:'flash', topic:'resp', q:'Normal SpO₂ range for a healthy adult?', a:'<b>95–100%</b> on room air (target may be 88–92% in some COPD patients per local policy).' },
+    // ---- MCQs (type:'mcq', correct = index into options) ----
+    { type:'mcq', topic:'obs', q:'An adult has a resting heart rate of 48 bpm. This is best described as:',
+      options:['Tachycardia','Bradycardia','Normal sinus rate','Asystole'], correct:1,
+      why:'Below 60 bpm at rest = <b>bradycardia</b>. Tachycardia is above 100 bpm.' },
+    { type:'mcq', topic:'obs', q:'Which vital sign change is often the EARLIEST indicator of clinical deterioration?',
+      options:['Blood pressure fall','Temperature spike','Respiratory rate rise','Pupil dilation'], correct:2,
+      why:'<b>Respiratory rate</b> rises early in deterioration; BP often falls late (compensated shock).' },
+    { type:'mcq', topic:'obs', q:'A blood pressure of 88/54 mmHg in an adult is best described as:',
+      options:['Hypertensive','Normotensive','Hypotensive','A normal paediatric value only'], correct:2,
+      why:'Systolic under ~90 mmHg is generally <b>hypotensive</b> in adults — assess the patient, not just the number.' },
+    { type:'mcq', topic:'resp', q:'Which SpO₂ reading on room air most warrants escalation in a previously well adult?',
+      options:['98%','96%','95%','89%'], correct:3,
+      why:'<b>89%</b> is below the normal 95–100% range and needs prompt assessment and escalation.' },
+    { type:'mcq', topic:'resp', q:'A respiratory rate of 26 breaths/min in a resting adult is:',
+      options:['Bradypnoea','Within normal limits','Tachypnoea','Apnoea'], correct:2,
+      why:'Above 20 breaths/min = <b>tachypnoea</b> — a red flag worth escalating.' },
+    // ---- marked short-answer (type:'saq', points = marking points) ----
+    { type:'saq', topic:'obs', q:'List the five core vital signs routinely measured in adult patients. (5 marks)', marks:5,
+      points:['Temperature','Pulse / heart rate','Respiratory rate','Blood pressure','Oxygen saturation (SpO₂)'],
+      model:'Many frameworks add pain as the "6th vital sign" and level of consciousness on EWS charts.' },
+    { type:'saq', topic:'resp', q:'Give five observable signs of increased work of breathing. (5 marks)', marks:5,
+      points:['Use of accessory muscles','Nasal flaring','Intercostal / subcostal recession','Tripod positioning','Inability to speak in full sentences'],
+      model:'Also acceptable: audible wheeze/stridor, pursed-lip breathing, paradoxical breathing.' },
+  ],
+  glossary: [
+    { term:'Bradycardia', def:'Resting heart rate below 60 bpm in an adult.' },
+    { term:'Tachypnoea', def:'Respiratory rate above 20 breaths per minute in a resting adult.' },
+    { term:'Hypoxaemia', def:'Abnormally low level of oxygen in the blood (low SpO₂ / PaO₂).' },
+  ],
+};
+/* ===== CONTENT PACK END ===== */
+
+'use strict';
+/* ============================ engine ============================ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const strip=s=>String(s).replace(/<[^>]+>/g,'');
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+
+/* ---- pack validation (surface content-authoring mistakes loudly) ---- */
+function validatePack(p){
+  const errs=[];
+  if(!p.id) errs.push('PACK.id missing');
+  if(!p.topics||!p.topics.length) errs.push('PACK.topics empty');
+  const tids=new Set((p.topics||[]).map(t=>t.id));
+  (p.cards||[]).forEach((c,i)=>{
+    if(!tids.has(c.topic)) errs.push(`card ${i}: unknown topic "${c.topic}"`);
+    if(!c.q) errs.push(`card ${i}: no question`);
+    if(c.type==='mcq'&&(!c.options||c.correct==null||!c.options[c.correct])) errs.push(`card ${i}: bad mcq options/correct`);
+    if(c.type==='saq'&&(!c.points||!c.points.length)) errs.push(`card ${i}: saq has no marking points`);
+    if(c.type==='flash'&&!c.a) errs.push(`card ${i}: flash has no answer`);
+    if(!['mcq','saq','flash'].includes(c.type)) errs.push(`card ${i}: unknown type "${c.type}"`);
+  });
+  return errs;
+}
+const packErrs=validatePack(PACK);
+if(packErrs.length) $('#packwarn').innerHTML=`<div class="packwarn">⚠️ <b>Content pack issues (${packErrs.length}):</b> ${packErrs.slice(0,6).map(esc).join(' · ')}${packErrs.length>6?' · …':''}</div>`;
+
+/* ---- state ---- */
+const KEY='cramengine.'+PACK.id;
+let S=load();
+function load(){
+  try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.srs) return s; }catch(e){}
+  return {theme:'dark',topic:'all',srs:{},mcq:{},exams:[],tts:false};
+}
+function save(){ localStorage.setItem(KEY,JSON.stringify(S)); }
+const topicName=id=>{const t=PACK.topics.find(t=>t.id===id);return t?`${t.icon} ${t.name}`:id;};
+const cardsOf=(type,topic)=>PACK.cards.map((c,i)=>({...c,idx:i})).filter(c=>c.type===type&&(topic==='all'||c.topic===topic));
+
+/* ---- SRS (Leitner boxes 0-4) ---- */
+const IVL=[0, 10*60e3, 24*3600e3, 3*24*3600e3, 7*24*3600e3]; // per box, ms
+function srsGet(i){ return S.srs[i]||{box:0,due:0,seen:0}; }
+function srsRate(i,r){ // r: 0 again, 1 hard, 2 good, 3 easy
+  const st=srsGet(i);
+  st.box = r===0?0 : r===1?st.box : Math.min(4, st.box+(r===3?2:1));
+  st.due = Date.now()+IVL[st.box];
+  st.seen++;
+  S.srs[i]=st; save();
+}
+function duePool(topic){
+  const all=cardsOf('flash',topic).concat(cardsOf('saq',topic));
+  const now=Date.now();
+  const due=all.filter(c=>srsGet(c.idx).due<=now);
+  return due.length?due:all; // never block cramming: fall back to full pool
+}
+
+/* ---- header / theme / tts ---- */
+$('#hTitle').textContent=PACK.title;
+$('#hSub').textContent=PACK.subtitle||'cram engine';
+document.title=PACK.title;
+function applyTheme(){ document.documentElement.setAttribute('data-theme',S.theme); }
+$('#btnTheme').onclick=()=>{S.theme=S.theme==='dark'?'light':'dark';save();applyTheme();};
+applyTheme();
+let ttsOn=false;
+$('#btnTts').onclick=()=>{ ttsOn=!ttsOn; $('#btnTts').style.color=ttsOn?'var(--acc)':''; if(!ttsOn) speechSynthesis.cancel(); };
+function speak(txt){ if(!ttsOn||!window.speechSynthesis) return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(strip(txt)); u.rate=1.05; speechSynthesis.speak(u); }
+
+/* ---- nav ---- */
+let VIEW='learn', CUR=null, EX=null;
+const view=$('#view');
+function nav(v){ VIEW=v; $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  ({learn:renderLearn,mcq:renderMcq,saq:renderSaq,exam:renderExamSetup,search:renderSearch,stats:renderStats})[v]();
+}
+$$('#nav button').forEach(b=>b.onclick=()=>nav(b.dataset.v));
+function chipRow(cb){
+  const html=`<div class="chips"><button class="chip ${S.topic==='all'?'on':''}" data-t="all">✨ All topics</button>${
+    PACK.topics.map(t=>`<button class="chip ${S.topic===t.id?'on':''}" data-t="${t.id}">${t.icon} ${esc(t.name)}</button>`).join('')}</div>`;
+  setTimeout(()=>$$('.chip').forEach(c=>c.onclick=()=>{S.topic=c.dataset.t;save();cb();}),0);
+  return html;
+}
+
+/* ---- Learn (flash + saq as flip cards with SRS) ---- */
+function renderLearn(){
+  const pool=duePool(S.topic);
+  if(!pool.length){ view.innerHTML=chipRow(renderLearn)+`<div class="empty">No cards in this topic yet.</div>`; return; }
+  CUR=pool[Math.floor(Math.random()*pool.length)];
+  const st=srsGet(CUR.idx);
+  view.innerHTML=chipRow(renderLearn)+`
+    <div class="card">
+      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">box ${st.box+1}/5</span><span class="tag right">learn</span></div>
+      <div class="q">${CUR.q}</div>
+      ${CUR.type==='saq'?`<div class="marks">${CUR.marks||CUR.points.length} marks — say your answer out loud, then flip.</div>`:''}
+      <div id="ansZone"><div class="btnrow"><button class="btn primary" id="flip">Show answer ↵</button></div></div>
+    </div>`;
+  speak(CUR.q);
+  $('#flip').onclick=flipLearn;
+  document.onkeydown=e=>{ if(VIEW==='learn'&&e.key==='Enter'&&$('#flip')) flipLearn(); };
+}
+function flipLearn(){
+  const c=CUR;
+  const body = c.type==='flash'
+    ? `<div class="answer"><div class="lab">Answer</div><div class="txt">${c.a}</div></div>`
+    : `<div class="answer"><div class="lab">Marking points</div><ul class="points">${c.points.map((p,i)=>`<li><span class="n">${i+1}</span><span>${p}</span></li>`).join('')}</ul>${c.model?`<div class="why">💡 ${c.model}</div>`:''}</div>`;
+  $('#ansZone').innerHTML=body+`
+    <div class="rate">
+      <button class="r1" data-r="0">✗ Again</button>
+      <button class="r2" data-r="1">Hard</button>
+      <button class="r3" data-r="2">Good</button>
+      <button class="r4" data-r="3">Easy</button>
+    </div>`;
+  speak(c.type==='flash'?c.a:c.points.join('. '));
+  $$('.rate button').forEach(b=>b.onclick=()=>{ srsRate(c.idx,+b.dataset.r); renderLearn(); });
+}
+
+/* ---- MCQ drill ---- */
+function renderMcq(){
+  const pool=cardsOf('mcq',S.topic);
+  if(!pool.length){ view.innerHTML=chipRow(renderMcq)+`<div class="empty">No MCQs in this topic yet.</div>`; return; }
+  CUR=pool[Math.floor(Math.random()*pool.length)];
+  const order=shuffle(CUR.options.map((_,i)=>i));
+  view.innerHTML=chipRow(renderMcq)+`
+    <div class="card">
+      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag right">mcq drill</span></div>
+      <div class="q">${CUR.q}</div>
+      <div class="opts">${order.map((oi,k)=>`<button class="opt" data-o="${oi}"><span class="k">${'ABCD'[k]}</span><span>${CUR.options[oi]}</span></button>`).join('')}</div>
+      <div id="fb"></div>
+    </div>`;
+  speak(CUR.q);
+  $$('.opt').forEach(b=>b.onclick=()=>{
+    const pick=+b.dataset.o, ok=pick===CUR.correct;
+    $$('.opt').forEach(o=>{ o.disabled=true;
+      if(+o.dataset.o===CUR.correct) o.classList.add('right');
+      else if(+o.dataset.o===pick) o.classList.add('wrong');
+    });
+    const m=S.mcq[CUR.idx]||{a:0,c:0}; m.a++; if(ok)m.c++; S.mcq[CUR.idx]=m; save();
+    $('#fb').innerHTML=`${CUR.why?`<div class="why">${ok?'✅':'❌'} <b>${ok?'Correct.':'Not quite.'}</b> ${CUR.why}</div>`:''}
+      <div class="btnrow"><button class="btn primary" id="next">Next ↵</button></div>`;
+    $('#next').onclick=renderMcq;
+    document.onkeydown=e=>{ if(VIEW==='mcq'&&e.key==='Enter'&&$('#next')) renderMcq(); };
+  });
+}
+
+/* ---- SAQ marked drill ---- */
+function renderSaq(){
+  const pool=cardsOf('saq',S.topic);
+  if(!pool.length){ view.innerHTML=chipRow(renderSaq)+`<div class="empty">No marked questions in this topic yet.</div>`; return; }
+  CUR=pool[Math.floor(Math.random()*pool.length)];
+  view.innerHTML=chipRow(renderSaq)+`
+    <div class="card">
+      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">${CUR.marks||CUR.points.length} marks</span><span class="tag right">marked drill</span></div>
+      <div class="q">${CUR.q}</div>
+      <div class="hinttxt">Write or say your full answer first — then reveal and mark yourself honestly.</div>
+      <div id="ansZone"><div class="btnrow"><button class="btn primary" id="flip">Reveal marking points ↵</button></div></div>
+    </div>`;
+  speak(CUR.q);
+  const reveal=()=>{
+    $('#ansZone').innerHTML=`
+      <div class="answer"><div class="lab">Tick every point you got</div>
+      <ul class="points" id="pts">${CUR.points.map((p,i)=>`<li data-i="${i}"><span class="n">${i+1}</span><span>${p}</span></li>`).join('')}</ul>
+      ${CUR.model?`<div class="why">💡 ${CUR.model}</div>`:''}
+      <div class="btnrow"><button class="btn primary" id="done">Score it</button></div></div>`;
+    $$('#pts li').forEach(li=>li.onclick=()=>li.classList.toggle('got'));
+    $('#done').onclick=()=>{
+      const got=$$('#pts li.got').length, tot=CUR.points.length;
+      const pct=got/tot;
+      srsRate(CUR.idx, pct>=1?3 : pct>=0.8?2 : pct>=0.5?1 : 0);
+      $('#done').outerHTML=`<div class="why" style="flex:1">Scored <b>${got}/${tot}</b> — ${pct>=0.8?'strong ✅':pct>=0.5?'getting there — this card will come back soon':'this card goes back to box 1 🔁'}</div><button class="btn primary" id="next">Next ↵</button>`;
+      $('#next').onclick=renderSaq;
+      document.onkeydown=e=>{ if(VIEW==='saq'&&e.key==='Enter'&&$('#next')) renderSaq(); };
+    };
+  };
+  $('#flip').onclick=reveal;
+  document.onkeydown=e=>{ if(VIEW==='saq'&&e.key==='Enter'&&$('#flip')) reveal(); };
+}
+
+/* ---- Exam sim ---- */
+function renderExamSetup(){
+  const cfg=PACK.exam||{mcq:10,saq:2,minutes:0,pass:80};
+  const nM=Math.min(cfg.mcq,cardsOf('mcq','all').length), nS=Math.min(cfg.saq,cardsOf('saq','all').length);
+  const last=S.exams[0];
+  view.innerHTML=`
+    <div class="card setup">
+      <h3>🎯 Exam simulation</h3>
+      <p><b>${nM}</b> MCQs + <b>${nS}</b> marked questions, all topics mixed${cfg.minutes?`, <b>${cfg.minutes} min</b> timer`:''}. No feedback until the end. Pass mark <b>${cfg.pass||80}%</b>.</p>
+      <button class="bigstart" id="start">START EXAM</button>
+      ${last?`<p style="margin:12px 0 0;text-align:center">Last attempt: <b>${last.score}%</b> ${last.pass?'✅':'❌'}</p>`:''}
+    </div>`;
+  $('#start').onclick=()=>{
+    EX={qs:shuffle(cardsOf('mcq','all')).slice(0,nM).concat(shuffle(cardsOf('saq','all')).slice(0,nS)),
+        i:0,ans:[],cfg,end:cfg.minutes?Date.now()+cfg.minutes*60e3:null,timer:null};
+    EX.qs=shuffle(EX.qs);
+    renderExamQ();
+    if(EX.end){ EX.timer=setInterval(()=>{ const el=$('#extimer'); if(!el){clearInterval(EX.timer);return;}
+      const left=EX.end-Date.now(); if(left<=0){ examMark(); return; }
+      el.textContent=`${Math.floor(left/60e3)}:${String(Math.floor(left%60e3/1e3)).padStart(2,'0')}`;
+      el.classList.toggle('low',left<60e3); },250); }
+  };
+}
+function renderExamQ(){
+  const q=EX.qs[EX.i];
+  const head=`<div class="topbar"><span>Question <b>${EX.i+1}</b> / ${EX.qs.length}</span>${EX.end?`<span class="timer" id="extimer">–:––</span>`:''}</div>
+    <div class="tprog"><i style="width:${EX.i/EX.qs.length*100}%"></i></div>`;
+  if(q.type==='mcq'){
+    const order=shuffle(q.options.map((_,i)=>i));
+    view.innerHTML=head+`<div class="card">
+      <div class="cmeta"><span class="tag acc">${topicName(q.topic)}</span><span class="tag right">1 mark</span></div>
+      <div class="q">${q.q}</div>
+      <div class="opts">${order.map((oi,k)=>`<button class="opt" data-o="${oi}"><span class="k">${'ABCD'[k]}</span><span>${q.options[oi]}</span></button>`).join('')}</div></div>`;
+    $$('.opt').forEach(b=>b.onclick=()=>{ EX.ans.push(+b.dataset.o); nextExam(); });
+  } else {
+    view.innerHTML=head+`<div class="card">
+      <div class="cmeta"><span class="tag acc">${topicName(q.topic)}</span><span class="tag right">${q.marks||q.points.length} marks</span></div>
+      <div class="q">${q.q}</div>
+      <div class="hinttxt">Answer in full on paper (or out loud) — you'll self-mark it in the review.</div>
+      <div class="btnrow"><button class="btn primary" id="donesaq">Answered — next</button></div></div>`;
+    $('#donesaq').onclick=()=>{ EX.ans.push(null); nextExam(); };
+  }
+}
+function nextExam(){ EX.i++; EX.i>=EX.qs.length?examMark():renderExamQ(); }
+function examMark(){
+  clearInterval(EX.timer);
+  while(EX.ans.length<EX.qs.length) EX.ans.push(undefined); // timer expiry
+  EX.marks=EX.qs.map((q,i)=> q.type==='mcq' ? {got: EX.ans[i]===q.correct?1:0, tot:1, ticks:[]} : {got:0, tot:q.points.length, ticks:q.points.map(()=>false)});
+  renderExamReview();
+}
+function renderExamReview(){
+  view.innerHTML=`<div class="card setup"><h3>Self-mark your written answers</h3>
+    <p>For each marked question, tick the points you actually got — honest marking is the whole game.</p></div>`+
+    EX.qs.map((q,i)=>{
+      if(q.type==='mcq') return '';
+      return `<div class="rev"><div class="rhead"><span class="ic">✍️</span><span class="qq">${q.q}</span></div>
+        <div class="rbody"><ul class="points" id="ep${i}">${q.points.map((p,k)=>`<li data-q="${i}" data-k="${k}"><span class="n">${k+1}</span><span>${p}</span></li>`).join('')}</ul>
+        ${q.model?`<div class="why" style="margin-top:10px">💡 ${q.model}</div>`:''}</div></div>`;
+    }).join('')+
+    `<div class="btnrow"><button class="btn primary" id="finish">Finish & score</button></div>`;
+  $$('.points li').forEach(li=>li.onclick=()=>{
+    li.classList.toggle('got');
+    const m=EX.marks[+li.dataset.q]; m.ticks[+li.dataset.k]=li.classList.contains('got');
+    m.got=m.ticks.filter(Boolean).length;
+  });
+  $('#finish').onclick=examResults;
+  window.scrollTo({top:0});
+}
+function examResults(){
+  const got=EX.marks.reduce((a,m)=>a+m.got,0), tot=EX.marks.reduce((a,m)=>a+m.tot,0);
+  const score=Math.round(got/tot*100), pass=score>=(EX.cfg.pass||80);
+  S.exams.unshift({d:new Date().toISOString().slice(0,10),score,pass}); S.exams=S.exams.slice(0,12); save();
+  view.innerHTML=`
+    <div class="result-hero ${pass?'pass':'fail'}"><div class="big">${score}%</div>
+      <div class="sub"><b>${got} / ${tot}</b> marks · pass ${EX.cfg.pass||80}% — ${pass?'<b>PASSED</b> 🎉':'keep drilling — the review below is where the marks are.'}</div></div>
+    ${EX.qs.map((q,i)=>{
+      const m=EX.marks[i];
+      if(q.type==='mcq') return `<div class="rev"><div class="rhead" data-i="${i}"><span class="ic">${m.got?'✅':'❌'}</span>
+        <span class="qq">${q.q}</span></div>
+        <div class="rbody hidden" id="rb${i}">
+          <div class="why">${m.got?'✅ You chose correctly.':`❌ You chose: <b>${EX.ans[i]!=null&&q.options[EX.ans[i]]!=null?esc(q.options[EX.ans[i]]):'—'}</b>`}<br/>Correct: <b>${esc(q.options[q.correct])}</b>${q.why?`<br/>${q.why}`:''}</div></div></div>`;
+      return `<div class="rev"><div class="rhead" data-i="${i}"><span class="ic">${m.got===m.tot?'✅':m.got?'➖':'❌'}</span>
+        <span class="qq">${q.q}</span><span style="font-weight:800">${m.got}/${m.tot}</span></div>
+        <div class="rbody hidden" id="rb${i}"><ul class="points">${q.points.map((p,k)=>`<li class="${m.ticks[k]?'got':''}"><span class="n">${k+1}</span><span>${p}</span></li>`).join('')}</ul></div></div>`;
+    }).join('')}
+    <div class="btnrow"><button class="btn primary" id="again">Run it again</button><button class="btn ghost" id="toStats">Stats</button></div>`;
+  $$('.rhead[data-i]').forEach(h=>h.onclick=()=>{const b=$('#rb'+h.dataset.i); if(b)b.classList.toggle('hidden');});
+  $('#again').onclick=renderExamSetup;
+  $('#toStats').onclick=()=>nav('stats');
+  window.scrollTo({top:0});
+}
+
+/* ---- Search ---- */
+function renderSearch(){
+  view.innerHTML=`<div class="search"><input id="sq" placeholder="Search every card and glossary term…" autocomplete="off"/></div><div id="sres"></div>`;
+  const box=$('#sres'), inp=$('#sq'); inp.focus();
+  const run=()=>{
+    const q=inp.value.trim().toLowerCase();
+    if(q.length<2){ box.innerHTML=`<div class="empty">Type at least 2 characters.</div>`; return; }
+    const hits=[];
+    PACK.cards.forEach(c=>{
+      const hay=(strip(c.q)+' '+strip(c.a||'')+' '+(c.points||[]).map(strip).join(' ')+' '+(c.options||[]).map(strip).join(' ')).toLowerCase();
+      if(hay.includes(q)) hits.push({t:`${topicName(c.topic)} · ${c.type.toUpperCase()}`, q:c.q,
+        a: c.type==='flash'?c.a : c.type==='mcq'?`Answer: <b>${c.options[c.correct]}</b>${c.why?' — '+c.why:''}` : c.points.map((p,i)=>`${i+1}. ${p}`).join('<br/>')});
+    });
+    (PACK.glossary||[]).forEach(g=>{ if((g.term+' '+g.def).toLowerCase().includes(q)) hits.push({t:'📖 Glossary', q:`<b>${esc(g.term)}</b>`, a:esc(g.def)}); });
+    box.innerHTML = hits.length ? hits.slice(0,40).map(h=>`<div class="sres"><div class="st">${h.t}</div><div>${h.q}</div><div class="sa">${h.a}</div></div>`).join('')
+      : `<div class="empty">No matches for "${esc(q)}".</div>`;
+  };
+  inp.oninput=run; run();
+}
+
+/* ---- Stats ---- */
+function renderStats(){
+  const flashN=PACK.cards.filter(c=>c.type!=='mcq').length;
+  const learned=Object.values(S.srs).filter(s=>s.box>=2).length;
+  const mA=Object.values(S.mcq).reduce((a,m)=>a+m.a,0), mC=Object.values(S.mcq).reduce((a,m)=>a+m.c,0);
+  view.innerHTML=`
+    <div class="statgrid">
+      <div class="stat"><div class="n">${learned}/${flashN}</div><div class="l">cards in box 3+</div></div>
+      <div class="stat"><div class="n">${mA?Math.round(mC/mA*100)+'%':'—'}</div><div class="l">mcq accuracy</div></div>
+      <div class="stat"><div class="n">${S.exams.length?S.exams[0].score+'%':'—'}</div><div class="l">last exam</div></div>
+    </div>
+    <h2 class="sec">Topics</h2>
+    ${PACK.topics.map(t=>{
+      const cs=PACK.cards.map((c,i)=>({...c,idx:i})).filter(c=>c.topic===t.id);
+      const rec=cs.filter(c=>c.type!=='mcq'&&srsGet(c.idx).box>=2).length;
+      const recTot=cs.filter(c=>c.type!=='mcq').length;
+      const ma=cs.filter(c=>c.type==='mcq').reduce((a,c)=>a+(S.mcq[c.idx]||{a:0}).a,0);
+      const mc=cs.filter(c=>c.type==='mcq').reduce((a,c)=>a+(S.mcq[c.idx]||{c:0}).c,0);
+      const pct=recTot?Math.round(rec/recTot*100):0;
+      return `<div class="catstat"><div class="top">${t.icon} ${esc(t.name)}<span class="m">${cs.length} cards</span></div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="sub">${rec}/${recTot} recall cards in box 3+ ${ma?` · MCQ ${Math.round(mc/ma*100)}% (${ma} tries)`:''}</div></div>`;
+    }).join('')}
+    ${S.exams.length?`<h2 class="sec">Exam history</h2>${S.exams.map(e=>`<div class="histrow"><span>${e.d}</span><span class="sc">${e.score}%</span><span class="pf ${e.pass?'p':'f'}">${e.pass?'PASS':'FAIL'}</span></div>`).join('')}`:''}
+    <div class="btnrow" style="margin-top:22px"><button class="btn ghost danger" id="reset">Reset all progress</button></div>`;
+  $('#reset').onclick=()=>{ if(confirm('Wipe all progress for this pack?')){ localStorage.removeItem(KEY); S=load(); save(); renderStats(); } };
+}
+
+nav('learn');
+</script>
+</body>
+</html>
