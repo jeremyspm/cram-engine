@@ -231,7 +231,7 @@ function validatePack(p){
   (p.cards||[]).forEach((c,i)=>{
     if(!tids.has(c.topic)) errs.push(`card ${i}: unknown topic "${c.topic}"`);
     if(!c.q) errs.push(`card ${i}: no question`);
-    if(c.type==='mcq'&&(!c.options||c.correct==null||!c.options[c.correct])) errs.push(`card ${i}: bad mcq options/correct`);
+    if(c.type==='mcq'&&(!c.options||c.options.length<2||c.options.length>4||c.correct==null||!c.options[c.correct])) errs.push(`card ${i}: mcq needs 2–4 options and a valid correct index`);
     if(c.type==='saq'&&(!c.points||!c.points.length)) errs.push(`card ${i}: saq has no marking points`);
     if(c.type==='flash'&&!c.a) errs.push(`card ${i}: flash has no answer`);
     if(!['mcq','saq','flash'].includes(c.type)) errs.push(`card ${i}: unknown type "${c.type}"`);
@@ -397,9 +397,10 @@ function renderExamSetup(){
     <div class="card setup">
       <h3>🎯 Exam simulation</h3>
       <p><b>${nM}</b> MCQs + <b>${nS}</b> marked questions, all topics mixed${cfg.minutes?`, <b>${cfg.minutes} min</b> timer`:''}. No feedback until the end. Pass mark <b>${cfg.pass||80}%</b>.</p>
-      <button class="bigstart" id="start">START EXAM</button>
+      ${nM+nS>0?`<button class="bigstart" id="start">START EXAM</button>`:`<div class="empty">This pack has no MCQ or marked-question cards yet — the exam sim needs at least one.</div>`}
       ${last?`<p style="margin:12px 0 0;text-align:center">Last attempt: <b>${last.score}%</b> ${last.pass?'✅':'❌'}</p>`:''}
     </div>`;
+  if(nM+nS===0) return;
   $('#start').onclick=()=>{
     EX={qs:shuffle(cardsOf('mcq','all')).slice(0,nM).concat(shuffle(cardsOf('saq','all')).slice(0,nS)),
         i:0,ans:[],cfg,end:cfg.minutes?Date.now()+cfg.minutes*60e3:null,timer:null};
