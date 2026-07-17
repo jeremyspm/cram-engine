@@ -25,9 +25,10 @@ Everything is one file, 100% offline, no dependencies, progress in
 **Give every pack a unique `id`** — it namespaces saved progress, so two tools
 never clobber each other's stats.
 
-> Note: card progress is keyed by the card's *position* in the array. Adding
-> cards at the end is safe; reordering or deleting mid-list shifts progress
-> between cards. For a live tool, append only.
+> Note: card progress is keyed by a hash of the card's type + question text,
+> so reordering, inserting, or deleting cards is safe. Editing a question's
+> *wording* resets that one card's progress (it's treated as a new card).
+> Old index-keyed progress from v1 tools migrates automatically on first load.
 
 ## PACK schema
 
