@@ -162,6 +162,11 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
   <div class="foot">100% offline · progress saved on this device</div>
 </div>
 
+<!-- Optional cloud sync: dormant unless signed in at jeremyspm.github.io. Fully offline-first without it.
+     Copied into every tool made from this template, so new cram tools sync for free. -->
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://jeremyspm.github.io/cloud/config.js"></script>
+<script src="https://jeremyspm.github.io/cloud/cloud.js"></script>
 <script>
 /* ╔══════════════════════════════════════════════════════════════════╗
    ║  CONTENT PACK — replace everything between START and END to      ║
@@ -247,6 +252,7 @@ if(packErrs.length) $('#packwarn').innerHTML=`<div class="packwarn">⚠️ <b>Co
 /* ---- state ---- */
 const KEY='cramengine.'+PACK.id;
 let S=load();
+if(window.Cloud) Cloud.sync([KEY]);   // syncs this pack's progress across devices when signed in; no-op otherwise
 function load(){
   try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.srs) return migrate(s); }catch(e){}
   return {v:2,theme:'dark',topic:'all',srs:{},mcq:{},exams:[],tts:false};
