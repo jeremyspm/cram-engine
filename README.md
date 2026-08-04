@@ -51,10 +51,76 @@ const PACK = {
     // points = the marking schedule (one tick each). model = extra notes.
     { type:'saq', topic:'anti', q:'List five… (5 marks)', marks:5,
       points:['p1','p2','p3','p4','p5'], model:'Also acceptable: …' },
+
+    // Put in order — steps authored in the CORRECT sequence, shown shuffled.
+    // Tap a bank item to fill the next slot; tap a filled slot to put it back.
+    { type:'order', topic:'anti', q:'Place these steps in order.',
+      steps:['first','second','third'], why:'…' },
+
+    // Fill the blanks — .text carries [[1]] … [[n]], one per blank.
+    { type:'cloze', topic:'anti', q:'Complete the passage.',
+      text:'The dose is [[1]] and the route is [[2]].',
+      blanks:[ {options:['a','b'],correct:0}, {options:['c','d'],correct:1} ], why:'…' },
+
+    // True/false SET — ONE mark for getting every statement right, unless you
+    // pass partial:true. That mirrors how the real Canvas paper scores them.
+    { type:'tfset', topic:'anti', q:'True or false?',
+      statements:[ {s:'…',v:true}, {s:'…',v:false} ], why:'…' },
+
+    // Matching — right-hand values must be unique (scoring compares by value).
+    // distractors are extra wrong options thrown into every dropdown.
+    { type:'match', topic:'anti', q:'Match each term to its definition.',
+      pairs:[ ['left','right'], ['left2','right2'] ], distractors:['nope'] },
   ],
   glossary: [ { term:'…', def:'…' } ],   // searchable, optional
 };
 ```
+
+### Card types at a glance
+
+| type | view | marks (default) |
+|---|---|---|
+| `flash` | Learn (SRS) | — |
+| `saq` | Learn, Marked drill, Exam | `points.length` |
+| `mcq` | Drill, Exam | 1 |
+| `order` | Drill, Exam | `steps.length` |
+| `cloze` | Drill, Exam | `blanks.length` |
+| `tfset` | Drill, Exam | **1** (all-or-nothing) |
+| `match` | Drill, Exam | `pairs.length` |
+
+Override any of them with an explicit `marks:`. Every card may also carry:
+
+- `fig:'<svg…>'` + `figcap:'…'` — an inline figure above the answer area.
+- `lean:'exam'` — keep it in Learn and Drill but **exclude it from the exam sim**
+  (for content the lecturer has said is final-exam-only).
+- `crit:'cvs-7'` — the blueprint criterion this card covers (see below).
+
+### Optional: criterion coverage
+
+If a course publishes a list of assessment criteria, declare them and the
+validator will *prove* the pack covers them:
+
+```js
+criteria: [ { id:'cvs-7', name:'Heart sounds and where best detected', blind:true }, … ],
+coverage: { min:6, blindMin:10, blindNeedsSaq:true },
+```
+
+`blind:true` marks a criterion no practice material covers. Those get a higher
+card floor, must include at least one SAQ, and the exam sim **oversamples them
+2×** until you've scored full marks on them. Packs without `criteria` skip all
+of this.
+
+### Exam sim recipe
+
+```js
+exam: { auto: 32, saq: 3, minutes: 65, pass: 65, noPaper: true,
+        mix: { mcq:.40, cloze:.20, match:.15, tfset:.15, order:.10 } },
+```
+
+`auto` draws across every machine-marked type; `mix` sets each type's share and
+the remainder is filled at random. `noPaper:true` shows a "no rough paper"
+warning on the setup screen. The old `{mcq: N}` key still works as an alias for
+`auto`.
 
 ## What the shell provides
 
