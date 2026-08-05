@@ -251,8 +251,14 @@ machine-marked and written marks is computed from `auto`, `saq`, `mix` and each 
   `?mode=learn|mcq|saq` still resolve, aliased onto Study.
 - **Mock test** — mixes machine-marked + written per `PACK.exam`, optional countdown,
   no feedback until the end, honest self-marking screen, pass/fail, attempt history.
-- **Search · Progress · Sources** — behind the `···` overflow. Three primary tabs is the
-  tool; these three are things you go and look for, not things you do.
+- **All cards · Search · Progress · Sources** — behind the `···` overflow. Three primary
+  tabs is the tool; these are things you go and look for, not things you do.
+- **All cards** — the whole pack, standing still. Group by topic, focus point, source
+  tier or question type, open a group, read every question with its answer straight
+  through, filter within it. It ignores the background-reading pool for the same reason
+  Search and the Brief do: this is the one view that must be able to say *everything*.
+  Every card carries a **⚑ Flag** button, and so does the study card and the mock-test
+  review — see below.
 - **Extras** — dark/light theme, days-left pill, dismissible first-run panel,
   mobile-first (verified at 375px), Enter-key driving throughout.
 
@@ -275,6 +281,46 @@ because an authored `why` explains the reasoning and rarely restates the answer.
 This is a floor, not a substitute. A synthesised line is enormously better than a bare
 red box and clearly worse than a written one — **`why:` on every machine-marked card is
 still the highest-value authoring left in any pack.**
+
+## Flagging a bad card
+
+Packs are built from a lecturer's own quizzes, and lecturers publish wrong answer keys.
+Writing `hs2-test1`'s 172 explanations turned up three: an ABG marked *metabolic*
+alkalosis whose values are a textbook *respiratory* one, a tamponade filed as
+cardiogenic in one question and obstructive in the next of the same quiz, and a
+diuretic card whose key takes the fluid route while the potassium answer sits on the
+same card. **Every one was found by a human reading the card.** So the engine ships the
+means to report one.
+
+**⚑ Flag** appears on every card in All cards, on the study card, and in the mock-test
+review — deliberately *not* during the mock test itself, same rule as the source badges:
+mid-question it is a hint the real paper will not give you. The panel asks what is wrong
+(seven reasons) plus an optional note.
+
+- **Flags are stored under `S.flags`, keyed by `ckey`** — `hash(type | question |
+  content signature)`, the same key progress records and `explanations.json` use. Edit
+  the card and the key changes, so a flag against a rewritten card stops resolving.
+  **That is the feature.** The flagged list shows those separately, with the question as
+  it read when it was flagged, rather than dropping them or re-attaching them to a
+  neighbouring card.
+- **They ride `Cloud.sync` for free**, because they live in the same state blob as
+  progress. A card flagged on a phone is waiting on the laptop that can fix it.
+- **There is no server, and the panel says so in those words.** "Saved on this device …
+  nothing is sent anywhere." Claiming a report had been *sent* when it went into
+  `localStorage` would break the self-explaining rule in the one place the reader
+  cannot check.
+- **All cards → ⚑ Flagged** copies or downloads them as JSON:
+  `{pack, exported, n, flags:[{ck, reason, note, at, type, topic, crit, stillInPack, q}]}`.
+
+The other end of that round trip is a per-tool script — **`hs2-test1/audit/flags.mjs` is
+the reference implementation, copy it.** It resolves each `ck` back to a card and prints
+the question, the answer, the explanation and the source, worst reason first. It is not
+a build gate: a flag is a reader's report, not a schema error, and blocking a ship on a
+subjective one would be wrong. It does carry one gate of its own — it re-derives `ckey`
+in Node, so before trusting a single result it **proves its copy of the hash still
+agrees** with the one that built the pack, by checking that every key in
+`explanations.json` resolves. Without that check a drifted hash would report all flags
+as stale and look entirely plausible doing it.
 
 ## Theme
 
