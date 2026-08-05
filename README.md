@@ -310,8 +310,14 @@ A pack whose honest card count is too big to get through is a pack nobody starts
 physiology sitting on focus points the lecturer's own questions already cover** — real
 content, but padding on ground the real thing already holds.
 
-Mark those `bg:true` and they leave the **default queue**. What that must never become
-is a hidden pack, so:
+Mark those `bg:true` and they leave the **default queue**.
+
+**Do not call this set "background reading" in the UI.** That is already the badge on
+every `textbook`-tier card, and the load-bearing ones stay in the queue — so the phrase
+put a card badged *Background reading* directly beneath a line saying background
+reading had been excluded. Describe the set by *why* it is out instead.
+
+What this must never become is a hidden pack, so:
 
 - the switch sits above the queue **under both doors**, states both counts, and
   restores everything in one tap;
