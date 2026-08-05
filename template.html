@@ -3,27 +3,60 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<meta name="theme-color" content="#0e1420"/>
+<meta name="theme-color" content="#161719"/>
 <title>Cram Engine — Example Pack</title>
 <style>
+/* ── Estate palette. Every value is lifted from hub/index.html:15-53, which took
+   them from Giga's Liquid theme: neutral surfaces and one indigo accent, in both
+   themes. Per the house rule this takes the hub's PALETTE and MATERIAL only —
+   never its chrome. The cram tool keeps its own shape. ── */
 :root{
-  --bg:#0e1420; --bg2:#141c2b; --card:#182133; --card2:#1e2941;
-  --line:#27324a; --line2:#33405c;
-  --tx:#e8eef7; --tx2:#9fb0c8; --tx3:#6d7f9c;
-  --acc:#4f9dff; --acc2:#2f6fd0;
-  --good:#39d98a; --hard:#ffce54; --miss:#ff6b6b;
-  --gGood:#123a2a; --gHard:#3a3413; --gMiss:#3a1a1a;
-  --shadow:0 10px 40px rgba(0,0,0,.45);
-  --r:16px; --maxw:760px;
+  --bg:#161719; --bg2:#161719; --card:#1c1c1f; --card2:#242427;
+  --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.15);
+  --tx:#f2f2f6; --tx2:rgba(255,255,255,.56); --tx3:rgba(255,255,255,.34);
+  --acc:#6366F1; --acc2:#565AE6;
+  --acc-tx:#818CF8;                 /* the accent as TEXT — #6366F1 on the card is 3.8:1, this is 5.7:1 */
+  --acc-soft:rgba(99,102,241,.16);
+  --good:#32D74B; --hard:#FF9F0A; --bad:#FF453A;
+  --onGood:#04120b; --onBad:#2b0604;   /* text on a FILLED good/bad chip: 10.0:1 and 5.5:1 */
+  --shadow:0 14px 36px rgba(0,0,0,.16);
+  /* `--r` is material and comes from the hub. `--maxw` is SHAPE and does not.
+     The hub's 620px is right for a link directory; this tool renders ported
+     anatomical figures, and 12 of hs2-test1's rasters are 1100px wide. At 620 they
+     land at 50% scale — against 63% here before, and 68% in hs2-module1, which is
+     where they were checked for legibility and which they are copied from byte for
+     byte. Taking the hub's measure halved a labelled diagram. Palette and material,
+     never chrome or shape. */
+  --r:14px; --maxw:760px;
 }
 html[data-theme="light"]{
-  --bg:#eef2f8; --bg2:#e3e9f3; --card:#ffffff; --card2:#f4f7fc;
-  --line:#dbe3ef; --line2:#c7d3e6;
-  --tx:#16202f; --tx2:#4a5a72; --tx3:#7d8ca5;
-  --acc:#1f6fe0; --acc2:#1657b8;
-  --good:#128a55; --hard:#a9791a; --miss:#c53b3b;
-  --gGood:#dcf7ea; --gHard:#faf0d2; --gMiss:#fbe0e0;
-  --shadow:0 8px 30px rgba(30,50,90,.14);
+  --bg:#eceef3; --bg2:#eceef3; --card:#ffffff; --card2:#f4f5f7;
+  --line:rgba(0,0,0,.10); --line2:rgba(0,0,0,.14);
+  --tx:#16161a; --tx2:rgba(0,0,0,.52); --tx3:rgba(0,0,0,.34);
+  --acc:#4F46E5; --acc2:#4138CF; --acc-tx:#4F46E5;
+  --acc-soft:rgba(79,70,229,.12);
+  --good:#12833A; --hard:#A35C00; --bad:#C62A20;
+  --onGood:#ffffff; --onBad:#ffffff;   /* the light semantics are dark FILLS, so the text on them flips */
+  --shadow:0 14px 36px rgba(20,24,40,.10);
+}
+/* Derived, and derived on purpose. Two traps live here:
+   - `--miss` is this engine's name for the house `--bad`. It appears all over the
+     stylesheet (.opt.wrong / .slot.wrong / .tfrow.wrong / .timer.low) and in the
+     result hero, so it is ALIASED rather than blind-renamed.
+   - `--gGood/--gHard/--gMiss` used to be hand-mixed washes baked from the OLD
+     accents. Carried across a palette change they would have left every
+     correct/incorrect state wearing a colour from a dead theme. They are now mixed
+     from the live token, so they can never drift again. */
+:root{
+  --miss:var(--bad);
+  --gGood:color-mix(in srgb,var(--good) 15%,transparent);
+  --gHard:color-mix(in srgb,var(--hard) 15%,transparent);
+  --gMiss:color-mix(in srgb,var(--bad)  15%,transparent);
+  --bGood:color-mix(in srgb,var(--good) 45%,transparent);
+  --bHard:color-mix(in srgb,var(--hard) 45%,transparent);
+  --bMiss:color-mix(in srgb,var(--bad)  45%,transparent);
+  --gAcc:var(--acc-soft);
+  --bAcc:color-mix(in srgb,var(--acc) 40%,transparent);
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -40,13 +73,19 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .brand{display:flex;flex-direction:column;line-height:1.15;margin-right:auto}
 .brand b{font-size:15px}
 .brand span{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1.2px}
+/* Days-left. Nothing else in the header does as much for urgency, and it costs
+   one pack field. Only rendered when the pack declares PACK.exam.date. */
+.dleft{flex:0 0 auto;font-size:11.5px;font-weight:800;letter-spacing:.3px;padding:6px 11px;border-radius:20px;background:var(--acc-soft);border:1px solid var(--bAcc);color:var(--acc-tx);white-space:nowrap}
+.dleft.soon{background:var(--gHard);border-color:var(--bHard);color:var(--hard)}
+.dleft.now{background:var(--gMiss);border-color:var(--bMiss);color:var(--bad)}
 .iconbtn{width:38px;height:38px;border-radius:10px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--tx2);transition:.15s}
 .iconbtn:hover{border-color:var(--line2);color:var(--tx)}
 .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
 .seg button{padding:7px 11px;border-radius:8px;font-size:12.5px;color:var(--tx2);font-weight:600;white-space:nowrap;transition:.12s}
 .seg button.on{background:var(--acc);color:#fff}
 .seg button:not(.on):hover{color:var(--tx);background:var(--card2)}
-.controls{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.controls{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:14px;max-width:100%}
+#navMore{font-size:15px;line-height:1;letter-spacing:1px;padding:7px 13px}
 .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
 .chip{padding:7px 11px;border-radius:20px;background:var(--card);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--tx2);transition:.12s}
 .chip:hover{border-color:var(--line2);color:var(--tx)}
@@ -55,8 +94,27 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
 .cmeta{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .tag{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--card2);border:1px solid var(--line2);color:var(--tx2)}
-.tag.acc{background:rgba(79,157,255,.14);color:var(--acc);border-color:rgba(79,157,255,.3)}
+.tag.acc{background:var(--acc-soft);color:var(--acc-tx);border-color:var(--bAcc)}
 .tag.right{margin-left:auto;color:var(--tx3);border-color:var(--line)}
+/* ---- where this came from (packs that declare card.tier) ---- */
+.prov{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:3px 8px;border-radius:6px;border:1px solid;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-family:inherit}
+/* The badge scale runs QUIET → LOUD, and it is deliberately not the scale you would
+   guess. "Background reading" fires on 61% of hs2-test1's cards; at full alarm
+   strength on two cards in three it stopped being a warning and became a texture
+   that taught the reader to distrust the whole tool — and it was never a defect in
+   the first place, just standard physiology that happens not to be in the slides.
+   So it is grey and silent, the RARE and valuable signal gets the strong colour,
+   and real alarm is reserved for the one tier that means nobody has checked this. */
+.prov.verbatim{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good);border-color:var(--good);font-weight:800}
+.prov.taught{background:var(--acc-soft);color:var(--acc-tx);border-color:var(--bAcc)}
+.prov.textbook{background:none;color:var(--tx3);border-color:var(--line2);font-weight:600}
+.prov.unverified{background:var(--gMiss);color:var(--bad);border-color:var(--bMiss)}
+.provdet{margin:10px 0 0;padding:11px 13px;border:1px solid var(--line2);border-left:3px solid var(--line2);border-radius:9px;background:var(--card2);font-size:12.5px;line-height:1.55;color:var(--tx2)}
+.provdet b{color:var(--tx)}
+.provdet .qt{display:block;margin-top:6px;padding:8px 10px;border-radius:7px;background:var(--bg2);color:var(--tx);font-style:italic}
+.provdet .loc{display:block;margin-top:5px;font-size:11.5px;color:var(--tx3)}
+.auditrow{display:flex;gap:9px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line)}
+.auditrow .n{flex:0 0 auto;font-weight:800;font-variant-numeric:tabular-nums;color:var(--tx3);min-width:34px}
 .q{font-size:19px;font-weight:600;line-height:1.5;margin:2px 0 4px}
 .marks{font-size:12.5px;color:var(--tx3);margin:4px 0 0}
 .answer{margin-top:16px;border-top:1px dashed var(--line2);padding-top:16px;animation:pop .22s ease}
@@ -66,14 +124,17 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .opt{display:flex;gap:10px;align-items:flex-start;text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:14.5px;line-height:1.45;transition:.15s;width:100%}
 .opt:hover{border-color:var(--acc)}
 .opt .k{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--bg2);border:1px solid var(--line2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--tx2)}
-.opt.right{background:var(--gGood);border-color:rgba(57,217,138,.5)}
-.opt.right .k{background:var(--good);color:#04120b;border-color:var(--good)}
-.opt.wrong{background:var(--gMiss);border-color:rgba(255,107,107,.5)}
-.opt.wrong .k{background:var(--miss);color:#fff;border-color:var(--miss)}
+.opt.right{background:var(--gGood);border-color:var(--bGood)}
+.opt.right .k{background:var(--good);color:var(--onGood);border-color:var(--good)}
+.opt.wrong{background:var(--gMiss);border-color:var(--bMiss)}
+.opt.wrong .k{background:var(--miss);color:var(--onBad);border-color:var(--miss)}
 .opt.picked{outline:2px solid var(--acc)}
 .opt:disabled{cursor:default}
 .why{margin-top:12px;padding:11px 13px;border-radius:10px;background:var(--card2);border:1px solid var(--line);font-size:13.5px;color:var(--tx2);line-height:1.5}
-.why b{color:var(--acc)}
+.why b{color:var(--acc-tx)}
+.whyx{display:block;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+.wlink{display:block;margin-top:10px;font-size:12.5px;font-weight:800;color:var(--acc-tx);text-align:left;padding:0;line-height:1.45}
+.wlink:hover{text-decoration:underline}
 /* ---- interactive card types: order / cloze / tfset / match ---- */
 .seq{display:flex;flex-direction:column;gap:7px;margin-top:16px}
 .slot{display:flex;gap:10px;align-items:center;background:var(--card2);border:1px dashed var(--line2);border-radius:10px;padding:10px 12px;font-size:14.5px;line-height:1.4;min-height:44px;text-align:left;width:100%;color:inherit;transition:.15s}
@@ -81,10 +142,10 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .slot .s{flex:1;min-width:0}
 .slot.full{border-style:solid}
 .slot.full:hover{border-color:var(--acc)}
-.slot.right{background:var(--gGood);border-color:rgba(57,217,138,.5);border-style:solid}
-.slot.right .n{background:var(--good);color:#04120b;border-color:var(--good)}
-.slot.wrong{background:var(--gMiss);border-color:rgba(255,107,107,.5);border-style:solid}
-.slot.wrong .n{background:var(--miss);color:#fff;border-color:var(--miss)}
+.slot.right{background:var(--gGood);border-color:var(--bGood);border-style:solid}
+.slot.right .n{background:var(--good);color:var(--onGood);border-color:var(--good)}
+.slot.wrong{background:var(--gMiss);border-color:var(--bMiss);border-style:solid}
+.slot.wrong .n{background:var(--miss);color:var(--onBad);border-color:var(--miss)}
 .slot .ph{color:var(--tx3);font-style:italic;font-size:13.5px}
 .bank{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
 .bank button{background:var(--card2);border:1px solid var(--line2);border-radius:9px;padding:9px 12px;font-size:13.5px;line-height:1.35;text-align:left;max-width:100%;transition:.12s}
@@ -100,14 +161,14 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .tfbtns{display:flex;gap:5px;flex:0 0 auto}
 .tfbtns button{width:38px;padding:8px 0;border-radius:8px;border:1px solid var(--line2);background:var(--bg2);font-weight:800;font-size:12.5px;color:var(--tx2);transition:.12s}
 .tfbtns button.on{background:var(--acc);border-color:var(--acc);color:#fff}
-.tfrow.right{background:var(--gGood);border-color:rgba(57,217,138,.45)}
-.tfrow.wrong{background:var(--gMiss);border-color:rgba(255,107,107,.45)}
+.tfrow.right{background:var(--gGood);border-color:var(--bGood)}
+.tfrow.wrong{background:var(--gMiss);border-color:var(--bMiss)}
 .tfrow .av{flex:0 0 auto;font-size:10.5px;font-weight:800;letter-spacing:.5px;color:var(--tx3)}
 .mrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:14.5px}
 .mrow .l{flex:1 1 150px;min-width:0;line-height:1.4}
 .mrow select{flex:1 1 170px;min-width:0}
-.mrow.right{background:var(--gGood);border-color:rgba(57,217,138,.45)}
-.mrow.wrong{background:var(--gMiss);border-color:rgba(255,107,107,.45)}
+.mrow.right{background:var(--gGood);border-color:var(--bGood)}
+.mrow.wrong{background:var(--gMiss);border-color:var(--bMiss)}
 .mfix{flex:1 1 100%;font-size:12.5px;color:var(--tx2);padding-top:2px}
 .figwrap{margin:15px 0 2px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fdfdfd}
 .figwrap img,.figwrap svg{display:block;width:100%;height:auto}
@@ -116,8 +177,8 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .points{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
 .points li{display:flex;gap:10px;align-items:flex-start;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14.5px;line-height:1.45;cursor:pointer;transition:.15s}
 .points li .n{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:var(--bg2);border:1px solid var(--line2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--tx2);margin-top:1px}
-.points li.got{background:var(--gGood);border-color:rgba(57,217,138,.4)}
-.points li.got .n{background:var(--good);color:#04120b;border-color:var(--good)}
+.points li.got{background:var(--gGood);border-color:var(--bGood)}
+.points li.got .n{background:var(--good);color:var(--onGood);border-color:var(--good)}
 .hinttxt{font-size:12.5px;color:var(--tx3);margin-top:10px;font-style:italic}
 .btnrow{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap}
 .btn{padding:13px 20px;border-radius:12px;font-size:14.5px;font-weight:800;letter-spacing:.3px;transition:.12s;flex:1}
@@ -130,7 +191,7 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .rate .r1:hover{background:var(--gMiss);border-color:var(--miss);color:var(--miss)}
 .rate .r2:hover{background:var(--gHard);border-color:var(--hard);color:var(--hard)}
 .rate .r3:hover{background:var(--gGood);border-color:var(--good);color:var(--good)}
-.rate .r4:hover{background:rgba(79,157,255,.15);border-color:var(--acc);color:var(--acc)}
+.rate .r4:hover{background:var(--acc-soft);border-color:var(--acc);color:var(--acc-tx)}
 .topbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:13px;color:var(--tx2);flex-wrap:wrap}
 .topbar .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;background:var(--card);border:1px solid var(--line);font-weight:700}
 .tprog{height:8px;border-radius:6px;background:var(--card2);overflow:hidden;margin-bottom:14px}
@@ -139,11 +200,11 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .timer.low{color:var(--miss)}
 .setup h3{margin:0 0 4px;font-size:18px}
 .setup p{margin:0 0 14px;color:var(--tx2);font-size:13.5px}
-.bigstart{width:100%;margin-top:8px;padding:15px;border-radius:12px;color:#fff;font-size:16px;font-weight:900;letter-spacing:.5px;background:linear-gradient(160deg,var(--acc),var(--acc2));box-shadow:0 8px 24px rgba(79,157,255,.35)}
+.bigstart{width:100%;margin-top:8px;padding:15px;border-radius:12px;color:#fff;font-size:16px;font-weight:900;letter-spacing:.5px;background:linear-gradient(160deg,var(--acc),var(--acc2));box-shadow:0 8px 24px var(--bAcc)}
 .bigstart:hover{filter:brightness(1.1)}
 .result-hero{border-radius:var(--r);padding:26px 20px;text-align:center;margin-bottom:14px;border:1px solid var(--line);animation:pop .3s ease}
-.result-hero.pass{background:linear-gradient(160deg,rgba(57,217,138,.16),rgba(57,217,138,.04));border-color:rgba(57,217,138,.45)}
-.result-hero.fail{background:linear-gradient(160deg,rgba(255,107,107,.16),rgba(255,107,107,.04));border-color:rgba(255,107,107,.45)}
+.result-hero.pass{background:linear-gradient(160deg,var(--gGood),transparent);border-color:var(--bGood)}
+.result-hero.fail{background:linear-gradient(160deg,var(--gMiss),transparent);border-color:var(--bMiss)}
 .result-hero .big{font-size:40px;font-weight:900;letter-spacing:-1px}
 .result-hero.pass .big{color:var(--good)}
 .result-hero.fail .big{color:var(--miss)}
@@ -173,8 +234,47 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .histrow .pf{margin-left:auto;font-weight:800;font-size:11.5px}
 .histrow .pf.p{color:var(--good)} .histrow .pf.f{color:var(--miss)}
 h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);margin:20px 0 9px}
-.danger{color:var(--miss);border-color:rgba(255,107,107,.4) !important}
-.packwarn{background:var(--gHard);border:1px solid rgba(255,206,84,.5);border-radius:11px;padding:11px 14px;font-size:13px;margin-bottom:12px;color:var(--tx)}
+.danger{color:var(--miss);border-color:var(--bMiss) !important}
+.packwarn{background:var(--gHard);border:1px solid var(--bHard);border-radius:11px;padding:11px 14px;font-size:13px;margin-bottom:12px;color:var(--tx)}
+/* ---- Brief: the exposition layer (packs that declare PACK.criteria) ---- */
+.brfbar{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:10px;font-size:13px;color:var(--tx2)}
+.brfbar .bar{flex:1;height:7px;border-radius:5px;background:var(--card2);overflow:hidden;min-width:40px}
+.brfbar .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .3s}
+.brfbar b{color:var(--tx);white-space:nowrap}
+.legend{font-size:12.5px;color:var(--tx2);background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:12px;line-height:1.6}
+.legend b{color:var(--tx)}
+/* First-run panel. Shown once, above the Brief, then never again. */
+.onb{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:var(--r);padding:16px 17px 14px;margin-bottom:14px;font-size:14.5px;line-height:1.62;color:var(--tx2)}
+.onb h3{margin:0 0 8px;font-size:18px;line-height:1.3;color:var(--tx)}
+.onb p{margin:0 0 9px}
+.onb b{color:var(--tx)}
+.onb .btn{width:100%;margin-top:5px}
+.brf{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:17px 17px 15px;margin-bottom:11px;scroll-margin-top:12px}
+.brf.lit{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.brf.read{border-color:var(--bGood)}
+.brfhead{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:3px}
+.brfhead .cn{font-size:11px;font-weight:800;color:var(--tx3);font-variant-numeric:tabular-nums;flex:0 0 auto}
+.brfhead h3{margin:0;font-size:17px;line-height:1.35;flex:1 1 200px;min-width:0}
+.blindtag{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--gHard);color:var(--hard);border:1px solid var(--bHard);flex:0 0 auto}
+.brfsub{font-size:11.5px;color:var(--tx3);margin-bottom:11px;line-height:1.5}
+.fact{padding:11px 0;border-top:1px solid var(--line)}
+.fact:first-of-type{border-top:none;padding-top:3px}
+.factq{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:5px;line-height:1.45}
+.factq .prov{margin-left:7px;vertical-align:middle;padding:2px 6px;font-size:9.5px}
+/* The Brief used to need a local override muting the textbook badge, because the
+   card views rendered it as an alarm. It is quiet everywhere now, so the override
+   is gone rather than duplicated — one badge, one appearance, all eight views. */
+.facta{font-size:14.5px;line-height:1.65;color:var(--tx2)}
+.facta b{color:var(--tx)}
+.factpts{margin:5px 0 0;padding-left:19px;font-size:14px;line-height:1.6;color:var(--tx2)}
+.factpts li{margin-bottom:3px}
+.fact .figwrap{margin:11px 0 0}
+.brfact{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.brfact .btn{flex:1 1 132px;padding:11px 14px;font-size:13.5px}
+.scopebar{display:flex;align-items:center;gap:10px;background:var(--acc-soft);border:1px solid var(--bAcc);border-radius:11px;padding:10px 13px;margin-bottom:12px;font-size:13px;color:var(--tx);line-height:1.45}
+.scopebar b{color:var(--acc-tx)}
+.scopebar button{margin-left:auto;flex:0 0 auto;font-size:12px;font-weight:800;color:var(--tx2);border:1px solid var(--line2);border-radius:8px;padding:6px 10px}
+.scopebar button:hover{color:var(--tx);border-color:var(--acc)}
 /* ---- two doors ---- */
 .doors{display:flex;gap:8px;margin-bottom:10px;align-items:stretch}
 .door{flex:1;padding:12px 10px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:13.5px;font-weight:800;color:var(--tx2);line-height:1.3;transition:.14s}
@@ -196,18 +296,27 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
   <header>
     <a class="iconbtn" href="https://jeremyspm.github.io/" title="Back to the hub" style="width:auto;padding:0 13px;gap:5px;font-size:13px;font-weight:700;text-decoration:none">← Hub</a>
     <div class="brand"><b id="hTitle">Cram Engine</b><span id="hSub">content pack</span></div>
-    <button class="iconbtn" id="btnTts" title="Read aloud">🔊</button>
+    <span class="dleft" id="hDays" hidden></span>
     <button class="iconbtn" id="btnTheme" title="Theme">◐</button>
   </header>
   <div id="packwarn"></div>
+  <div id="onboard"></div>
   <div class="controls">
+    <!-- Five primary tabs is the whole tool. Search, Progress and Sources are things
+         you go looking for, not things you do, so they sit behind the ··· rather than
+         making the first screen an eight-way decision. -->
     <div class="seg" id="nav">
+      <button data-v="brief" id="navBrief" hidden>Brief</button>
       <button data-v="learn" class="on">Learn</button>
       <button data-v="mcq">Drill</button>
-      <button data-v="saq">Marked drill</button>
-      <button data-v="exam">Exam sim</button>
+      <button data-v="saq">Written</button>
+      <button data-v="exam">Mock test</button>
+      <button id="navMore" title="More" aria-expanded="false" aria-controls="nav2">···</button>
+    </div>
+    <div class="seg hidden" id="nav2">
       <button data-v="search">Search</button>
-      <button data-v="stats">Stats</button>
+      <button data-v="stats">Progress</button>
+      <button data-v="audit" id="navAudit" hidden>Sources</button>
     </div>
   </div>
   <div id="view"></div>
@@ -229,9 +338,19 @@ const PACK = {
   id: 'example-vitals',              // UNIQUE per tool — namespaces saved progress
   title: 'Vital Signs — Example Pack',
   subtitle: 'Cram Engine demo',
-  // exam-sim composition. `auto` draws from every machine-marked type; `mix`
-  // is optional and sets the share of each type (remainder filled at random).
-  exam: { auto: 6, saq: 1, minutes: 10, pass: 80,
+  // OPTIONAL — who teaches this course. The ENGINE never carries a name and never
+  // carries a pronoun: it says "the lecturer" when this is absent, and uses the name
+  // when it is present. Do not put a pronoun here; a shared template that assumes a
+  // lecturer's gender is wrong for the next course by construction.
+  lecturer: 'Dr Rangi',
+  // Mock-test composition. `auto` draws from every machine-marked type; `mix` is
+  // optional and sets the share of each type (remainder filled at random).
+  // OPTIONAL `date` (YYYY-MM-DD) puts a days-left counter in the header and feeds
+  // the first-run panel. Omit it and both simply do not render.
+  // `pass` is the benchmark. Set `passIsTarget:true` when the course does NOT publish
+  // a pass mark — the engine then calls it a target and says so, instead of telling a
+  // student they need a score the course has never asked for.
+  exam: { auto: 6, saq: 1, minutes: 10, pass: 80, date: '2026-12-01',
           mix:{ mcq:.40, cloze:.20, match:.15, tfset:.15, order:.10 } },
   // OPTIONAL — enrols this tool in the hub's ⚡ Study engine. Point at ids
   // from the hub's deadlines.js and the hub can schedule this pack into
@@ -241,31 +360,46 @@ const PACK = {
     { id:'obs',  name:'Observations', icon:'🩺' },
     { id:'resp', name:'Respiratory',  icon:'🫁' },
   ],
+  // OPTIONAL — the published assessment criteria this pack covers. The KEY stays
+  // `criteria` because every pack and every build script already speaks it; the
+  // student never meets the word, and every rendered string calls them FOCUS POINTS,
+  // which is what the course's own document calls them.
+  // Declaring them switches on the BRIEF view (cards grouped under each one and
+  // rendered as readable prose) and the build-time coverage check. A card names one
+  // with `crit:`. They may straddle topics — obs-1 below does — and the Brief copes.
+  criteria: [
+    { id:'obs-1',  name:'Normal adult vital sign ranges' },
+    { id:'obs-2',  name:'Recognising and escalating deterioration' },
+    { id:'resp-1', name:'Respiratory assessment and breathing patterns' },
+  ],
   cards: [
     // ---- flashcards (type:'flash') ----
-    { type:'flash', topic:'obs', q:'Normal adult resting heart rate range?', a:'<b>60–100 beats per minute.</b> Below 60 = bradycardia, above 100 = tachycardia.' },
-    { type:'flash', topic:'obs', q:'Normal adult oral temperature range?', a:'Approximately <b>36.5–37.5 °C</b>. Above ~38.0 °C is generally considered febrile.' },
-    { type:'flash', topic:'resp', q:'Normal adult respiratory rate at rest?', a:'<b>12–20 breaths per minute.</b> RR is the most sensitive early indicator of deterioration.' },
-    { type:'flash', topic:'resp', q:'Normal SpO₂ range for a healthy adult?', a:'<b>95–100%</b> on room air (target may be 88–92% in some COPD patients per local policy).' },
+    // Flash ANSWERS are what the Brief renders as prose, so write them in teaching
+    // order under each criterion — the Brief reads them top to bottom.
+    { type:'flash', topic:'obs', crit:'obs-1', q:'Normal adult resting heart rate range?', a:'<b>60–100 beats per minute.</b> Below 60 = bradycardia, above 100 = tachycardia.' },
+    { type:'flash', topic:'obs', crit:'obs-1', q:'Normal adult oral temperature range?', a:'Approximately <b>36.5–37.5 °C</b>. Above ~38.0 °C is generally considered febrile.' },
+    { type:'flash', topic:'resp', crit:'obs-1', q:'Normal adult respiratory rate at rest?', a:'<b>12–20 breaths per minute.</b> RR is the most sensitive early indicator of deterioration.' },
+    { type:'flash', topic:'resp', crit:'obs-1', q:'Normal SpO₂ range for a healthy adult?', a:'<b>95–100%</b> on room air (target may be 88–92% in some COPD patients per local policy).' },
+    { type:'flash', topic:'obs', crit:'obs-2', q:'Which vital sign changes earliest in clinical deterioration, and why?', a:'<b>Respiratory rate.</b> It rises early because the body compensates for hypoxia and acidosis by increasing ventilation, long before the blood pressure moves. A <b>falling blood pressure is a late sign</b> — by the time it drops, compensation has already failed.' },
     // ---- MCQs (type:'mcq', correct = index into options) ----
-    { type:'mcq', topic:'obs', q:'An adult has a resting heart rate of 48 bpm. This is best described as:',
+    { type:'mcq', topic:'obs', crit:'obs-1', q:'An adult has a resting heart rate of 48 bpm. This is best described as:',
       options:['Tachycardia','Bradycardia','Normal sinus rate','Asystole'], correct:1,
       why:'Below 60 bpm at rest = <b>bradycardia</b>. Tachycardia is above 100 bpm.' },
-    { type:'mcq', topic:'obs', q:'Which vital sign change is often the EARLIEST indicator of clinical deterioration?',
+    { type:'mcq', topic:'obs', crit:'obs-2', q:'Which vital sign change is often the EARLIEST indicator of clinical deterioration?',
       options:['Blood pressure fall','Temperature spike','Respiratory rate rise','Pupil dilation'], correct:2,
       why:'<b>Respiratory rate</b> rises early in deterioration; BP often falls late (compensated shock).' },
-    { type:'mcq', topic:'obs', q:'A blood pressure of 88/54 mmHg in an adult is best described as:',
+    { type:'mcq', topic:'obs', crit:'obs-1', q:'A blood pressure of 88/54 mmHg in an adult is best described as:',
       options:['Hypertensive','Normotensive','Hypotensive','A normal paediatric value only'], correct:2,
       why:'Systolic under ~90 mmHg is generally <b>hypotensive</b> in adults — assess the patient, not just the number.' },
-    { type:'mcq', topic:'resp', q:'Which SpO₂ reading on room air most warrants escalation in a previously well adult?',
+    { type:'mcq', topic:'resp', crit:'obs-2', q:'Which SpO₂ reading on room air most warrants escalation in a previously well adult?',
       options:['98%','96%','95%','89%'], correct:3,
       why:'<b>89%</b> is below the normal 95–100% range and needs prompt assessment and escalation.' },
-    { type:'mcq', topic:'resp', q:'A respiratory rate of 26 breaths/min in a resting adult is:',
+    { type:'mcq', topic:'resp', crit:'resp-1', q:'A respiratory rate of 26 breaths/min in a resting adult is:',
       options:['Bradypnoea','Within normal limits','Tachypnoea','Apnoea'], correct:2,
       why:'Above 20 breaths/min = <b>tachypnoea</b> — a red flag worth escalating.' },
     // ---- put in order (type:'order') — steps authored in the CORRECT sequence.
     //      Marks = one per step landed in the right slot. ----
-    { type:'order', topic:'resp', q:'Place the steps of a standard adult respiratory assessment in order.',
+    { type:'order', topic:'resp', crit:'resp-1', q:'Place the steps of a standard adult respiratory assessment in order.',
       steps:['Wash hands and introduce yourself','Position the patient upright and expose the chest',
              'Count respirations for a full 60 seconds without telling them','Note depth, rhythm and effort',
              'Document the rate and escalate if outside 12–20'],
@@ -273,7 +407,7 @@ const PACK = {
 
     // ---- fill the blanks (type:'cloze') — .text carries [[1]] … [[n]].
     //      Marks = one per blank. ----
-    { type:'cloze', topic:'obs', q:'Complete the passage on escalating a deteriorating patient.',
+    { type:'cloze', topic:'obs', crit:'obs-2', q:'Complete the passage on escalating a deteriorating patient.',
       text:'A rising respiratory rate is an [[1]] sign of deterioration, while a falling blood pressure is usually a [[2]] one, because the body [[3]] for blood loss before the pressure drops.',
       blanks:[ {options:['early','irrelevant','late'],correct:0},
                {options:['early','late','harmless'],correct:1},
@@ -282,7 +416,7 @@ const PACK = {
 
     // ---- true / false set (type:'tfset') — ONE mark for the whole set unless
     //      you pass partial:true. That's how the real Canvas paper scores them. ----
-    { type:'tfset', topic:'obs', q:'Are the following statements about adult vital signs true or false?',
+    { type:'tfset', topic:'obs', crit:'obs-1', q:'Are the following statements about adult vital signs true or false?',
       statements:[ {s:'A resting heart rate of 55 bpm in an adult is bradycardic.',v:true},
                    {s:'A systolic blood pressure of 85 mmHg is within normal adult limits.',v:false},
                    {s:'Respiratory rate is usually the last vital sign to change in deterioration.',v:false} ],
@@ -290,7 +424,7 @@ const PACK = {
 
     // ---- matching (type:'match') — right-hand values must be unique;
     //      distractors are extra wrong options. Marks = one per pair. ----
-    { type:'match', topic:'resp', q:'Match each breathing pattern to its correct term.',
+    { type:'match', topic:'resp', crit:'resp-1', q:'Match each breathing pattern to its correct term.',
       pairs:[ ['Respiratory rate above 20/min','Tachypnoea'],
               ['Respiratory rate below 12/min','Bradypnoea'],
               ['Absence of breathing','Apnoea'],
@@ -298,10 +432,11 @@ const PACK = {
       distractors:['Dyspnoea','Orthopnoea'] },
 
     // ---- marked short-answer (type:'saq', points = marking points) ----
-    { type:'saq', topic:'obs', q:'List the five core vital signs routinely measured in adult patients. (5 marks)', marks:5,
+    { type:'saq', topic:'obs', crit:'obs-1', q:'List the five core vital signs routinely measured in adult patients. (5 marks)', marks:5,
       points:['Temperature','Pulse / heart rate','Respiratory rate','Blood pressure','Oxygen saturation (SpO₂)'],
       model:'Many frameworks add pain as the "6th vital sign" and level of consciousness on EWS charts.' },
-    { type:'saq', topic:'resp', q:'Give five observable signs of increased work of breathing. (5 marks)', marks:5,
+    // resp-1 has no flash card, so the Brief falls back to this SAQ's marking points.
+    { type:'saq', topic:'resp', crit:'resp-1', q:'Give five observable signs of increased work of breathing. (5 marks)', marks:5,
       points:['Use of accessory muscles','Nasal flaring','Intercostal / subcostal recession','Tripod positioning','Inability to speak in full sentences'],
       model:'Also acceptable: audible wheeze/stridor, pursed-lip breathing, paradoxical breathing.' },
   ],
@@ -319,18 +454,33 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
 const strip=s=>String(s).replace(/<[^>]+>/g,'');
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
-/* stable per-card progress key: hash of type+question text — reordering cards
-   is safe; editing a question's wording resets just that card's progress */
-function ckey(c){ let h=5381; const s=c.type+'|'+strip(c.q); for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return 'k'+(h>>>0).toString(36); }
+/* Stable per-card progress key: hash of type + question + a signature of the card's
+   OWN content. Reordering cards is safe; editing a question or its answers resets
+   just that card's progress.
+
+   The content signature is not decoration. Harvested questions share generic stems —
+   hs2-test1 has nine true/false sets all asking "Are the following true or false?"
+   and ten cloze cards all titled "Complete the passage. (MODULE 1)". Keyed on the
+   question alone, all ten collapsed onto ONE progress record: answering one marked
+   the other nine answered, corrupted their accuracy, and lifted all ten out of the
+   priority order together. 32 of 587 cards were affected. */
+function hash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return 'k'+(h>>>0).toString(36); }
+function csig(c){
+  return strip([c.a,c.text,(c.options||[]).join('~'),(c.statements||[]).map(s=>s.s).join('~'),
+    (c.pairs||[]).map(p=>p.join('>')).join('~'),(c.steps||[]).join('~'),(c.points||[]).join('~')]
+    .filter(Boolean).join('|'));
+}
+function ckey(c){ return hash(c.type+'|'+strip(c.q)+'|'+csig(c)); }
+const ckeyLegacy=c=>hash(c.type+'|'+strip(c.q));   // v2 keys, for migration only
 
 /* ---- card taxonomy ----
-   AUTO   = machine-marked; live in the Drill view and the exam sim
+   AUTO   = machine-marked; live in the Drill view and the mock test
    RECALL = you grade yourself; live in Learn on the Leitner SRS          */
 const AUTO=['mcq','order','cloze','tfset','match'];
 const RECALL=['flash','saq'];
 const ALLTYPES=AUTO.concat(RECALL);
 const isAuto=c=>AUTO.includes(c.type), isRecall=c=>RECALL.includes(c.type);
-const TYPELABEL={mcq:'multichoice',order:'put in order',cloze:'fill the blanks',tfset:'true / false',match:'matching',saq:'short answer',flash:'flashcard'};
+const TYPELABEL={mcq:'multichoice',order:'put in order',cloze:'fill the blanks',tfset:'true / false',match:'matching',saq:'written answer',flash:'flashcard'};
 
 /* marks per card — mirrors how the real Canvas paper scores each type:
    ordering and cloze pay per correct position/blank, matching per pair,
@@ -401,15 +551,36 @@ function validateCoverage(p){
   const cfg=Object.assign({min:0,blindMin:0,blindNeedsSaq:false},p.coverage||{});
   const errs=[];
   p.criteria.forEach(cr=>{
-    const cs=(p.cards||[]).filter(c=>c.crit===cr.id);
+    /* A card that ALSO covers this focus point counts toward it — the Brief already
+       files it under both. Counting only `crit` here made the engine disagree with
+       build.mjs, which has always counted both: the build could pass while the page
+       reported a failure, which is precisely the split that let a self-warning ship. */
+    const cs=(p.cards||[]).filter(c=>c.crit===cr.id||(c.alsoCrit||[]).includes(cr.id));
     const floor=cr.blind?Math.max(cfg.min,cfg.blindMin):cfg.min;
-    if(cs.length<floor) errs.push(`criterion ${cr.id} has ${cs.length} cards, needs ${floor}`);
-    if(cr.blind&&cfg.blindNeedsSaq&&!cs.some(c=>c.type==='saq')) errs.push(`criterion ${cr.id} is a blind spot with no SAQ card`);
+    if(cs.length<floor) errs.push(`focus point "${cr.name||cr.id}" has ${cs.length} cards, needs ${floor}`);
+    if(cr.blind&&cfg.blindNeedsSaq&&!cs.some(c=>c.type==='saq')) errs.push(`focus point "${cr.name||cr.id}" is never practised anywhere in the course and has no written-answer card`);
   });
   return errs;
 }
+/* Where validation failures go — and, more to the point, where they do not.
+
+   These are AUTHORING errors phrased in authoring vocabulary, and they used to be the
+   very first thing a cold reader saw: a build-time lint result rendered into the
+   production page, telling a student in four words of jargon that the tool has
+   problems with itself. Whatever that did for our integrity, what it did for theirs
+   was make the thing look broken before they had read a single card.
+
+   So the student never sees it and the author always does. `?dev=1` puts the banner
+   back, the console carries it either way, the Sources view lists it for anyone who
+   goes looking, and build.mjs now fails the build outright so a pack with errors in
+   it does not reach a reader at all. Nothing is hidden; it has simply stopped being
+   shouted at the person who cannot act on it. */
+const DEV=new URLSearchParams(location.search).get('dev')==='1';
 const packErrs=validatePack(PACK);
-if(packErrs.length) $('#packwarn').innerHTML=`<div class="packwarn">⚠️ <b>Content pack issues (${packErrs.length}):</b> ${packErrs.slice(0,6).map(esc).join(' · ')}${packErrs.length>6?' · …':''}</div>`;
+if(packErrs.length){
+  console.warn(`[cram-engine] ${packErrs.length} content-pack issue(s). Open with ?dev=1 to see them in the page.\n  `+packErrs.join('\n  '));
+  if(DEV) $('#packwarn').innerHTML=`<div class="packwarn">🔧 <b>Author view — ${packErrs.length} content-pack issue${packErrs.length===1?'':'s'}:</b> ${packErrs.map(esc).join(' · ')}</div>`;
+}
 
 /* ---- state ---- */
 const KEY='cramengine.'+PACK.id;
@@ -417,14 +588,31 @@ let S=load();
 if(window.Cloud) Cloud.sync([KEY]);   // syncs this pack's progress across devices when signed in; no-op otherwise
 function load(){
   try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.srs) return migrate(s); }catch(e){}
-  return {v:2,theme:'dark',topic:'all',door:'ready',srs:{},mcq:{},exams:[],tts:false};
+  return {v:3,theme:'dark',topic:'all',door:'ready',srs:{},mcq:{},exams:[],read:{},saq:{}};
 }
-function migrate(s){ // v1 keyed progress by card index; v2 keys by question hash
-  if(s.v===2) return s;
-  const remap=o=>{ const out={}; for(const k in o){
-    if(/^\d+$/.test(k)){ const c=PACK.cards[+k]; if(c) out[ckey(c)]=o[k]; }
-    else out[k]=o[k]; } return out; };
-  s.srs=remap(s.srs||{}); s.mcq=remap(s.mcq||{}); s.v=2; return s;
+/* v1 keyed progress by card index · v2 by a hash of the question · v3 adds the
+   card's content signature so cards sharing a question stem stop sharing a record. */
+function migrate(s){
+  if(s.v===3) return s;
+  if(!s.v||s.v<2){
+    const remap=o=>{ const out={}; for(const k in o){
+      if(/^\d+$/.test(k)){ const c=PACK.cards[+k]; if(c) out[ckeyLegacy(c)]=o[k]; }
+      else out[k]=o[k]; } return out; };
+    s.srs=remap(s.srs||{}); s.mcq=remap(s.mcq||{});
+  }
+  /* Where a v2 key belonged to exactly one card its record moves across. Where
+     several cards shared it the record is DROPPED, not copied onto all of them —
+     copying would silently mark up to nine never-seen cards as mastered, which is
+     the opposite of what a cram tool should do with an uncertainty. */
+  const owners={};
+  PACK.cards.forEach(c=>{ const k=ckeyLegacy(c); (owners[k]=owners[k]||[]).push(c); });
+  const lift=o=>{ const out={}; for(const k in o){
+    const own=owners[k];
+    if(own){ if(own.length===1) out[ckey(own[0])]=o[k]; }
+    else out[k]=o[k];                       // card since edited or removed — leave as is
+  } return out; };
+  s.srs=lift(s.srs||{}); s.mcq=lift(s.mcq||{});
+  s.v=3; return s;
 }
 function save(){ localStorage.setItem(KEY,JSON.stringify(S)); }
 if(!S.door) S.door='ready';        // saves made before the two doors existed
@@ -436,7 +624,7 @@ const cardsOf=(type,topic)=>{ const ts=Array.isArray(type)?type:[type];
 /* ============ interactive question runners (the AUTO types) ============
    A "runner" holds one attempt at one card: the shuffled presentation
    order, the response so far, and whether it's been revealed. The same
-   three functions drive the Drill view, the exam sim and the exam review. */
+   three functions drive the Drill view, the mock test and its review. */
 function makeRunner(c,resp){
   const r={c,rev:false,resp:null};
   switch(c.type){
@@ -474,9 +662,148 @@ function markAuto(c,resp){
   return {got:0,tot};
 }
 function figHTML(c){ return c.fig?`<div class="figwrap">${c.fig}</div>${c.figcap?`<div class="figcap">${c.figcap}</div>`:''}`:''; }
+
+/* ---- where each card came from ---------------------------------------------
+   Optional. A pack that declares `tier` on its cards gets a badge saying where the
+   card came from, tappable for the source and the exact quote. Packs without `tier`
+   render exactly as before — provHTML returns ''.
+
+   Two rules hold this together.
+
+   ONE: the labels are what a student would say. `verbatim`, `taught`, `textbook`
+   and `unverified` are database values and they never reach the screen. A reader
+   scanning a card should learn "this was on a past quiz" without first learning
+   our vocabulary for it.
+
+   TWO: the loudness is inverted from what you would expect. Background reading is
+   the majority of a well-made pack — 61% of hs2-test1 — and dressing the majority
+   in a warning glyph does not make the tool honest, it makes it look faulty, and it
+   invites the reader to write off two cards in three. It is also simply not true
+   that the content is suspect: it is ordinary physiology that happens not to be in
+   the slides, which is what a study guide is for. So background reading is grey and
+   silent, a past quiz question gets the strong colour because that is the rare thing
+   worth scanning for, and real alarm is spent only on the tier that genuinely means
+   nobody has checked this.
+
+   The engine carries NO pronouns and no lecturer's name. `PACK.lecturer` supplies a
+   name when a pack has one; without it every string still reads correctly with "the
+   lecturer". A shared template that assumes a lecturer's gender is wrong for the
+   next course by construction. */
+const LECT=(PACK.lecturer||'the lecturer'), LECTS=LECT+"'s";
+const LECTU=LECT.charAt(0).toUpperCase()+LECT.slice(1);
+const PROV={
+  verbatim:{ic:'📄',lab:'From a past quiz',
+    blurb:`Copied out of one of ${LECTS} own past quizzes — the question, the options and the correct answer are exactly as they were set. This is the closest you get to seeing the real paper.`},
+  taught:{ic:'📘',lab:'From the lecture slides',
+    blurb:'Pinned to one specific place in the course material. The quote below is re-checked against that source every time this tool is built.'},
+  textbook:{ic:'',lab:'Background reading',
+    blurb:`Standard anatomy and physiology, written for this pack so the examinable facts have something to sit on, then cross-checked against the module hub. It is not in ${LECTS} own slides, so it is unlikely to come back at you word for word — but it is what makes the rest of this make sense, and it is not a warning.`},
+  unverified:{ic:'⛔',lab:'Unchecked',
+    blurb:'This card names a source that is not on disk, so nobody has verified it. Trust it less than anything else here.'},
+};
+const provOf=c=>PROV[c&&c.tier]?c.tier:null;
+const provLabel=t=>`${PROV[t].ic?PROV[t].ic+' ':''}${PROV[t].lab}`;
+function provHTML(c){
+  const t=provOf(c); if(!t) return '';
+  return `<button class="prov ${t}" data-prov="1" data-ck="${c.key||ckey(c)}" aria-expanded="false">${provLabel(t)}</button>`;
+}
+function provDetailHTML(c){
+  const t=provOf(c); if(!t) return '';
+  const evs=Array.isArray(c.ev)?c.ev:(c.ev?[c.ev]:[]);
+  let body=`<b>${provLabel(t)}.</b> ${esc(PROV[t].blurb)}`;
+  /* `srcNote` is what the pack knows about this card's sourcing. It used to live in
+     `why`, which is the field the drill view renders as the EXPLANATION of a wrong
+     answer — so 123 of hs2-test1's drill cards answered "why was I wrong?" with
+     "no citation — standard textbook content written for the pack". One field, one
+     job: `why` explains, `srcNote` sources. */
+  if(c.srcNote) body+=`<span class="loc">${esc(c.srcNote)}</span>`;
+  for(const e of evs){
+    if(e.quiz) body+=`<span class="loc">📄 ${esc(e.quiz)} · ${esc(e.n||'')}</span>`;
+    else if(e.src){
+      if(e.quote) body+=`<span class="qt">“${esc(e.quote)}”</span>`;
+      body+=`<span class="loc">${esc(SRCLABEL(e.src))}${e.loc?' · '+esc(e.loc):''}</span>`;
+    }
+  }
+  if(c.candidateEv&&c.candidateEv.src)
+    body+=`<span class="loc">Possible source, not yet confirmed: ${esc(SRCLABEL(c.candidateEv.src))}${c.candidateEv.loc?' · '+esc(c.candidateEv.loc):''}</span>`;
+  if(c.selfMark) body+=`<span class="loc">This one was self-marked in Canvas — no model answer is published for it.</span>`;
+  return `<div class="provdet">${body}</div>`;
+}
+/* Source ids are machine keys (SRC-2026-RESP2); show something a human recognises. */
+function SRCLABEL(id){
+  return String(id).replace(/^SRC-/,'').replace(/-/g,' ')
+    .toLowerCase().replace(/\b\w/g,m=>m.toUpperCase());
+}
 /* a card may name the course document it came from — shown under the answer so
    you can always tell a sourced fact from a textbook one */
 function srcHTML(c){ return c.src?`<div class="srcline">📄 Source: ${esc(c.src)}</div>`:''; }
+
+/* ============ the explanation floor ============================================
+   NO drill card may show a mark with nothing beside it. Ever.
+
+   This is the moment the tool either teaches the reader or loses them, and until now
+   it coin-flipped: 268 of hs2-test1's 299 drill cards landed a wrong answer on a red
+   box and a number. The card was shown WHICH answer was right and told nothing about
+   what it had just got wrong — for a reader who half-absorbed the lecture, which is
+   the stated target, that is the least useful possible response.
+
+   Two layers, and only the first is here. The floor SYNTHESISES a minimum honest
+   line from what the card already knows: the correct option, the pairs missed, the
+   blanks missed, the statements flipped. It is deliberately not a fabricated
+   rationale — it states what is true and then hands the reader through to the Brief
+   section for that focus point, which is where the actual prose explanation lives.
+   An authored `why:` always wins where one exists; the floor is what happens
+   underneath, not a replacement for writing them. */
+function synthWhy(c,resp){
+  const B=s=>`<b>${strip(s)}</b>`, R=resp;
+  switch(c.type){
+    case 'mcq':{
+      const right=`The answer is ${B(c.options[c.correct])}.`;
+      return (R!=null&&R!==c.correct&&c.options[R]!=null)?`${right} You went for ${B(c.options[R])}.`:right;
+    }
+    case 'order':{
+      const out=(R||[]).map((si,i)=>si===i?null:i).filter(x=>x!=null);
+      const seq=c.steps.map((s,i)=>`<b>${i+1}.</b> ${strip(s)}`).join(' → ');
+      return out.length?`${out.length} step${out.length===1?'':'s'} out of place. The right order is ${seq}.`
+                       :`That is the order, start to finish.`;
+    }
+    case 'cloze':{
+      const miss=c.blanks.map((b,i)=>(R||[])[i]===b.correct?null:`${i+1}. ${B(b.options[b.correct])}`).filter(Boolean);
+      return miss.length?`The blanks you missed — ${miss.join(' · ')}.`
+                        :`Every blank right.`;
+    }
+    case 'tfset':{
+      const miss=c.statements.map((s,i)=>(R||[])[i]===s.v?null:`“${strip(s.s)}” is ${B(s.v?'true':'false')}`).filter(Boolean);
+      return miss.length?`What you missed — ${miss.join(' · ')}.`
+                        :`All ${c.statements.length} right.`;
+    }
+    case 'match':{
+      const miss=c.pairs.map((p,i)=>(R||[])[i]===p[1]?null:`${strip(p[0])} → ${B(p[1])}`).filter(Boolean);
+      return miss.length?`The pairs you missed — ${miss.join(' · ')}.`
+                        :`Every pair right.`;
+    }
+  }
+  return '';
+}
+/* The way through to the prose. Only offered when the pack HAS a Brief and this card
+   names a focus point that is actually in it — a dead link would be worse than none. */
+function briefLink(c){
+  if(!HASBRIEF()||!c||!c.crit) return '';
+  const cr=(PACK.criteria||[]).find(x=>x.id===c.crit); if(!cr) return '';
+  return `<button class="wlink" data-brief="${c.crit}">→ Read the full explanation: ${esc(cr.name||cr.id)}</button>`;
+}
+/* One feedback block, used by the Drill view and by the mock-test review, so the floor
+   cannot be honoured in one place and forgotten in the other.
+
+   The two halves are additive, not either/or. What the right answer WAS always shows —
+   an authored `why:` explains the reasoning but rarely restates the answer, and the
+   two together are what a reader needs. Doing it either/or meant a cloze with an
+   authored note stopped telling you which blanks you had missed. */
+function feedbackHTML(c,resp,head){
+  const facts=synthWhy(c,resp);
+  const why=c.why?`<span class="whyx">${c.why}</span>`:'';
+  return `<div class="why">${head||''}${facts}${why}${briefLink(c)}</div>`;
+}
 
 function runnerHTML(r){
   const c=r.c, rev=r.rev, resp=r.resp;
@@ -494,8 +821,7 @@ function runnerHTML(r){
         if(rev&&si!=null) cls+=(si===i?' right':' wrong');
         return `<button class="${cls}" data-slot="${i}"${rev?' disabled':''}><span class="n">${i+1}</span><span class="s">${si!=null?c.steps[si]:'<i class="ph">tap a step below</i>'}</span></button>`;
       }).join('')}</div>
-      ${rev?`<div class="why">Correct order: ${c.steps.map((s,i)=>`<b>${i+1}.</b> ${strip(s)}`).join(' &nbsp;→&nbsp; ')}</div>`
-           :`<div class="bank">${r.ord.map(oi=>`<button data-step="${oi}"${used.has(oi)?' disabled':''}>${c.steps[oi]}</button>`).join('')}</div>`}`;
+      ${rev?'':`<div class="bank">${r.ord.map(oi=>`<button data-step="${oi}"${used.has(oi)?' disabled':''}>${c.steps[oi]}</button>`).join('')}</div>`}`;
   }
 
   if(c.type==='cloze'){
@@ -507,8 +833,10 @@ function runnerHTML(r){
       html=html.split('[['+(i+1)+']]').join(
         `<select class="${cls}" data-b="${i}"${rev?' disabled':''}><option value=""${sel==null?' selected':''}>— select —</option>${opts}</select>`);
     });
-    const misses=rev?c.blanks.map((b,i)=>resp[i]===b.correct?null:`<b>${i+1}.</b> ${strip(b.options[b.correct])}`).filter(Boolean):[];
-    return `<div class="clozebody">${html}</div>${misses.length?`<div class="why">Correct answers you missed: ${misses.join(' &nbsp;·&nbsp; ')}</div>`:''}`;
+    /* The correct answers used to be restated here as well as in the feedback block,
+       so a wrong cloze printed the same list twice. There is one explanation block
+       now and `synthWhy` owns it — see the explanation floor. */
+    return `<div class="clozebody">${html}</div>`;
   }
 
   if(c.type==='tfset') return c.statements.map((s,i)=>{
@@ -563,31 +891,185 @@ function srsRate(i,r){ // r: 0 again, 1 hard, 2 good, 3 easy
   st.seen++;
   S.srs[i]=st; save();
 }
-function duePool(topic){
-  const all=cardsOf(RECALL,topic);
-  const now=Date.now();
-  const due=all.filter(c=>srsGet(c.key).due<=now);
-  return due.length?due:all; // never block cramming: fall back to full pool
-}
 
-/* ---- header / theme / tts ---- */
+/* ---- header / theme / days left ---- */
 $('#hTitle').textContent=PACK.title;
 $('#hSub').textContent=PACK.subtitle||'cram engine';
 document.title=PACK.title;
 function applyTheme(){ document.documentElement.setAttribute('data-theme',S.theme); }
 $('#btnTheme').onclick=()=>{S.theme=S.theme==='dark'?'light':'dark';save();applyTheme();};
 applyTheme();
-let ttsOn=false;
-$('#btnTts').onclick=()=>{ ttsOn=!ttsOn; $('#btnTts').style.color=ttsOn?'var(--acc)':''; if(!ttsOn) speechSynthesis.cancel(); };
-function speak(txt){ if(!ttsOn||!window.speechSynthesis) return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(strip(txt)); u.rate=1.05; speechSynthesis.speak(u); }
 
-/* ---- nav ---- */
+/* ---- the benchmark, and whether we are allowed to call it a pass mark ----------
+   `exam.pass` is the number the mock test and the readiness readout mark against.
+   Plenty of courses never publish one — Health Science 2 specifies everything else
+   about its tests (duration, question count, SAQ share, conditions, weighting) and
+   states no pass mark anywhere, and the number this pack carried turned out to be
+   the 65 MINUTE duration sitting in the wrong field. It was then rendered as "you
+   need 65% to pass", which is a rule the course has never made.
+
+   So a pack that has not sourced its number sets `exam.passIsTarget:true`, and every
+   string that mentions it says TARGET and says whose it is. A benchmark is still
+   useful — the mock test needs something to mark against, and aiming at a bare pass
+   is bad advice — but the tool must not invent a requirement and attribute it to the
+   course. Packs whose pass mark IS published leave the flag off and read as before. */
+const PASSMARK=()=>((PACK.exam&&PACK.exam.pass)||80);
+const PASSTARGET=()=>!!(PACK.exam&&PACK.exam.passIsTarget);
+const passPhrase=()=>PASSTARGET()?`against a <b>${PASSMARK()}%</b> target`:`you need <b>${PASSMARK()}%</b> to pass`;
+const passWord=()=>PASSTARGET()?'target':'pass';
+const passCaveat=()=>PASSTARGET()
+  ?`The course publishes no pass mark for this one, so <b>${PASSMARK()}%</b> is this tool's target — set above a bare pass to leave you some margin.`
+  :'';
+
+/* Days until the sitting. Optional: a pack with no `exam.date` renders nothing and
+   behaves exactly as before. Parsed as LOCAL midnight, not UTC — `new Date('2026-08-23')`
+   is UTC midnight, which in NZ is already midday on the 23rd and would report a day fewer
+   than the student has. */
+function examDate(){
+  const d=PACK.exam&&PACK.exam.date; if(!d) return null;
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d); if(!m) return null;
+  return new Date(+m[1],+m[2]-1,+m[3]);
+}
+function daysLeft(){
+  const d=examDate(); if(!d) return null;
+  const today=new Date(); today.setHours(0,0,0,0);
+  return Math.round((d-today)/864e5);
+}
+(function renderDaysLeft(){
+  const n=daysLeft(); if(n==null) return;
+  const el=$('#hDays'); el.hidden=false;
+  el.textContent = n>1?`${n} days left` : n===1?'Tomorrow' : n===0?'Today' : 'Test has been';
+  el.className='dleft'+(n<0?'':n<=2?' now':n<=7?' soon':'');
+})();
+
+/* Source badges are wired by delegation: the card views re-render constantly and
+   per-render wiring would have to be repeated in each of them. Deliberately NOT added
+   to the mock test — knowing mid-question that a card is background reading is a hint
+   the real paper will not give you. It appears in the review afterwards instead. */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-prov]'); if(!b) return;
+  /* The Brief puts dozens of cards on one screen, so the card is resolved from the
+     button and the detail fills the slot inside its OWN fact block. The single-card
+     views have one .provslot per .card and still fall back to CUR. */
+  const host=b.closest('.fact')||b.closest('.card');
+  const slot=host&&host.querySelector('.provslot'); if(!slot) return;
+  const ck=b.dataset.ck;
+  const card=ck?PACK.cards.find(x=>ckey(x)===ck):null;
+  const open=slot.innerHTML!=='';
+  slot.innerHTML=open?'':provDetailHTML(card||CUR);
+  b.setAttribute('aria-expanded',String(!open));
+});
+
+
+/* ---- Sources: where this pack's content came from ---------------------------
+   Only shown for packs that declare `tier`. The house rule is that a tool must say
+   what it does not know rather than sound uniformly confident, so this is a plain
+   count of what came off a past quiz, what is pinned to the lecture material, and
+   what was written for the pack — plus anything the build flags about itself.
+
+   This is also where the content-pack validator's output lands now. A reader can
+   come and find it; they are simply never made to walk past it. */
+function renderAudit(){
+  const cards=PACK.cards||[];
+  const by={verbatim:[],taught:[],textbook:[],unverified:[],untiered:[]};
+  for(const c of cards) (by[c.tier]||by.untiered).push(c);
+  const n=t=>by[t].length, pct=t=>cards.length?Math.round(100*n(t)/cards.length):0;
+
+  const gaps=(PACK.criteria||[]).filter(c=>c.acknowledgedGap||c.blind);
+  const byTopic={};
+  for(const c of by.textbook) byTopic[c.topic]=(byTopic[c.topic]||0)+1;
+  const topics=Object.entries(byTopic).sort((a,b)=>b[1]-a[1]);
+
+  view.innerHTML=`
+    <div class="card">
+      <h3>🔎 Where this came from</h3>
+      <p style="color:var(--tx2);font-size:14px;line-height:1.6;margin:2px 0 14px">
+        Every card records its own source. Tap the badge on any card to see the document
+        and the exact quote it was checked against.</p>
+      <div class="statgrid">
+        <div class="catstat"><div class="top"><b>📄 From a past quiz</b><span class="m">${n('verbatim')}</span></div>
+          <div class="bar"><i style="width:${pct('verbatim')}%"></i></div>
+          <div class="sub">Copied out of ${esc(LECTS)} own past quizzes, wording and answer key unchanged. The most valuable thing in here.</div></div>
+        <div class="catstat"><div class="top"><b>📘 From the lecture slides</b><span class="m">${n('taught')}</span></div>
+          <div class="bar"><i style="width:${pct('taught')}%"></i></div>
+          <div class="sub">Pinned to one place in the course material by a quote the build re-checks every time.</div></div>
+        <div class="catstat"><div class="top"><b>Background reading</b><span class="m">${n('textbook')}</span></div>
+          <div class="bar"><i style="width:${pct('textbook')}%"></i></div>
+          <div class="sub">Standard anatomy and physiology written for this pack so the examinable facts have something to sit on, then cross-checked against the module hub. Normal for a study guide — not a warning.</div></div>
+        ${n('unverified')?`<div class="catstat"><div class="top"><b>⛔ Unchecked</b><span class="m">${n('unverified')}</span></div>
+          <div class="bar"><i style="width:${pct('unverified')}%"></i></div>
+          <div class="sub">Names a source that is not on disk. Nobody has verified these — trust them less than anything else here.</div></div>`:''}
+      </div>
+      <p style="color:var(--tx3);font-size:12.5px;margin:10px 0 0">
+        ${n('verbatim')+n('taught')} of ${cards.length} cards
+        (${Math.round(100*(n('verbatim')+n('taught'))/Math.max(cards.length,1))}%) trace back to something the course itself published.</p>
+    </div>
+
+    ${gaps.length?`<div class="card" style="margin-top:14px">
+      <h3>Never practised</h3>
+      <p style="color:var(--tx2);font-size:13.5px;margin:2px 0 10px">The course lists these as examinable, but no practice test we can read covers them. They are not hidden from you, and this tool leads with them.</p>
+      ${gaps.map(c=>`<div class="auditrow"><span class="n">${c.herQuestions!=null?c.herQuestions:'—'}</span>
+        <span><b>${esc(c.name||c.id)}</b><br><span style="color:var(--tx3);font-size:12.5px">${
+          esc(c.acknowledgedGap|| (c.blind?'No question in any practice material we can read touches this focus point.':''))}</span></span></div>`).join('')}
+    </div>`:''}
+
+    ${topics.length?`<div class="card" style="margin-top:14px">
+      <h3>Where the background reading sits</h3>
+      <p style="color:var(--tx2);font-size:13.5px;margin:2px 0 10px">Background-reading cards by topic — the parts worth a second look against the lecture slides if you have the time.</p>
+      ${topics.map(([t,k])=>`<div class="auditrow"><span class="n">${k}</span><span>${esc(topicName(t))}</span></div>`).join('')}
+    </div>`:''}
+
+    ${packErrs.length?`<div class="card" style="margin-top:14px">
+      <h3>What the build flags about itself</h3>
+      <p style="color:var(--tx2);font-size:13.5px;margin:2px 0 10px">This tool checks its own content every time it is built. These checks did not pass. They are authoring problems rather than anything you can act on — they are here because hiding them would be worse than showing them.</p>
+      ${packErrs.map(e=>`<div class="auditrow"><span class="n">!</span><span>${esc(e)}</span></div>`).join('')}
+    </div>`:''}`;
+}
+
+/* ---- nav ----
+   Five tabs are the tool: read it, learn it, drill it, write it, sit it. Search,
+   Progress and Sources are things you go and look for rather than things you do, so
+   they live behind the ··· — an eight-way choice on first contact is a tax paid by
+   every user for three views most of them will open twice. */
 let VIEW='learn', CUR=null, EX=null;
 const view=$('#view');
-function nav(v){ VIEW=v; $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  ({learn:renderLearn,mcq:renderDrill,saq:renderSaq,exam:renderExamSetup,search:renderSearch,stats:renderStats})[v]();
+const SECOND=['search','stats','audit'];
+const navBtns=()=>$$('#nav button[data-v], #nav2 button[data-v]');
+function showMore(on){
+  $('#nav2').classList.toggle('hidden',!on);
+  $('#navMore').classList.toggle('on',on);
+  $('#navMore').setAttribute('aria-expanded',String(on));
 }
-$$('#nav button').forEach(b=>b.onclick=()=>nav(b.dataset.v));
+function nav(v){
+  VIEW=v;
+  navBtns().forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  if(SECOND.includes(v)) showMore(true);      // never leave the active tab hidden
+  ({brief:renderBrief,learn:renderLearn,mcq:renderDrill,saq:renderSaq,exam:renderExamSetup,search:renderSearch,stats:renderStats,audit:renderAudit})[v]();
+}
+navBtns().forEach(b=>b.onclick=()=>nav(b.dataset.v));
+$('#navMore').onclick=()=>showMore($('#nav2').classList.contains('hidden'));
+
+/* ---- first run --------------------------------------------------------------
+   There was no onboarding at all: a cold reader met an error banner, eight tabs and
+   two unexplained doors. This is ten seconds of plain language and then it is gone
+   for good. Every number in it is read off the pack, so a new cram tool inherits it
+   without anybody writing copy. */
+function renderOnboard(){
+  const slot=$('#onboard'); if(!slot) return;
+  if(S.onboarded||!HASBRIEF()){ slot.innerHTML=''; return; }
+  const cfg=Object.assign({auto:0,saq:0,minutes:0,pass:80},PACK.exam||{});
+  const nQ=(cfg.auto||0)+(cfg.saq||0), d=examDate(), dl=daysLeft();
+  const when=d?d.toLocaleDateString('en-NZ',{day:'numeric',month:'long'}):null;
+  const facts=[cfg.minutes?`${cfg.minutes} minutes`:null,nQ?`${nQ} questions`:null,when?`on ${when}`:null].filter(Boolean).join(', ');
+  slot.innerHTML=`<div class="onb">
+    <h3>${esc(PACK.title)}</h3>
+    <p>${facts?esc(facts.charAt(0).toUpperCase()+facts.slice(1))+'. ':''}${PASSTARGET()?passCaveat():`You need <b>${cfg.pass}%</b> to pass.`}</p>
+    <p>There are <b>${(PACK.criteria||[]).length} focus points</b> the course says the test can ask you about. This tool has every one of them.</p>
+    <p><b>Start by reading the Brief.</b> Then drill. That is the whole method.</p>
+    <button class="btn primary" id="onbGo">Got it${dl!=null&&dl>0?` — ${dl} day${dl===1?'':'s'} to go`:''}</button>
+  </div>`;
+  $('#onbGo').onclick=()=>{ S.onboarded=true; save(); slot.innerHTML=''; };
+}
 /* ============================ two doors ============================
    ONE dataset, two ways in. "Get me ready" lets the engine choose the
    queue; "I'll pick" hands the topics back. Neither locks anything, and
@@ -597,25 +1079,104 @@ function cardWeak(c){
   const m=S.mcq[c.key];
   return (!m||!m.t) ? true : (m.g/m.t)<0.6;      // never drilled counts as weak
 }
-const TIERMSG=[
-  'Starting with the <b>blueprint blind spots</b> — criteria flagged as having no practice coverage.',
-  'Starting with what you are <b>shakiest</b> on.',
-  'Working through what is <b>due for review</b>.',
-  'Nothing is flagged — running the <b>full pool</b>.'
-];
-function priorityPool(types){
+/* Rank 0 is "highest-value unknown". Two things qualify, not one:
+   - a focus point the course lists that no practice test covers, and
+   - a question the LECTURER has set before, which is the strongest available
+     predictor of what gets asked again.
+   Never-practised-only was right when the pack had no captured questions. Once 195
+   of the lecturer's own questions were harvested, that alone meant the opening queue
+   was 18 cards of unsourced textbook content served ahead of every question actually
+   set in the past. */
+function cardRank(c,cm){
+  const cr=cm[c.crit];
+  if(cardWeak(c)&&((cr&&cr.blind)||c.tier==='verbatim')) return 0;
+  if(cardWeak(c)) return 1;
+  if(isRecall(c)&&srsGet(c.key).due<=Date.now()) return 2;
+  return 3;
+}
+
+/* ================= the deck =================================================
+   Cards are DEALT FROM AN ORDERED DECK, not drawn at random.
+
+   What this replaces, and why. The old queue ranked cards 0-3 and then rendered
+   only the single lowest rank present. On this pack that meant a cold user's Learn
+   view held 69 of 288 cards and three whole topics — gas exchange, cardiac output,
+   terminology — were unreachable, because a card only leaves rank 0 after two
+   correct recalls and the pool was sampled at random. 356 of 587 cards were gated.
+   On top of that, random-with-replacement needs ~333 draws to show a 69-card pool
+   once, and repeats the card you just saw 1 time in 69.
+
+   A deck fixes all of it at once:
+     - EVERY card is in the deck. Rank sets ORDER, never membership.
+     - No card repeats until the deck is exhausted, so coverage is guaranteed.
+     - Topics are interleaved by even stride inside each rank band, so a big topic
+       cannot bunch and a small one cannot starve.
+     - A card you get wrong is spliced back in a few cards ahead, which is what
+       makes it a cram tool rather than a reading order.
+   The deck rebuilds and re-ranks when it runs out, or when the door, topic or
+   focus scope changes.                                                       */
+/* Even stride: a topic holding n of N cards is dealt every N/n slots, so every
+   topic is spread across the whole deck whatever its size, and the largest topic
+   cannot bunch at the tail the way plain round-robin leaves it. */
+function strideMerge(groups,N){
+  const out=[];
+  for(const g of groups) g.forEach((c,i)=>out.push({c,pos:(i+0.5)*N/g.length}));
+  return out.sort((a,b)=>a.pos-b.pos).map(x=>x.c);
+}
+function deckSource(types){
+  /* "Get me ready" ranks the whole pack; "I'll pick" honours the topic chip. A
+     focus scope from the Brief overrides both, and falls back to the whole pack
+     for that focus point if the current filter holds none of it. */
+  const base=S.door==='ready'?cardsOf(types,'all'):cardsOf(types,S.topic);
+  const scoped=!S.crit?base:(critScope(base).length?critScope(base):critScope(cardsOf(types,'all')));
+  /* Two cards with the same key are the same card — same type, same question, same
+     answer. hs2-test1 carries five such pairs from a double-import in the harvest.
+     They share one progress record by definition, so dealing both just serves the
+     reader the identical question twice in a pass. */
+  const seen=new Set();
+  return scoped.filter(c=>seen.has(c.key)?false:(seen.add(c.key),true));
+}
+function buildDeck(types){
   const cm={}; (PACK.criteria||[]).forEach(c=>cm[c.id]=c);
-  const all=cardsOf(types,'all');
-  const rank=c=>{
-    const cr=cm[c.crit];
-    if(cr&&cr.blind&&cardWeak(c)) return 0;
-    if(cardWeak(c)) return 1;
-    if(isRecall(c)&&srsGet(c.key).due<=Date.now()) return 2;
-    return 3;
-  };
-  const ranked=all.map(c=>({c,r:rank(c)}));
-  const tier=ranked.length?Math.min(...ranked.map(x=>x.r)):3;
-  return {pool:ranked.filter(x=>x.r===tier).map(x=>x.c), tier, total:all.length};
+  const src=deckSource(types);
+  /* Order INSIDE each topic by rank, THEN stride-merge the topics.
+     Doing it the other way round — rank bands first, topics spread inside each
+     band — looks equivalent and is not. Band 0 on this pack contains no gas
+     exchange, cardiac output or terminology card at all, so those topics could
+     not appear until card 70 of 288. Topic coverage has to be the outer loop:
+     rank decides WHAT you see from a topic, never WHETHER you reach it. */
+  const by={};
+  src.forEach(c=>(by[c.topic]=by[c.topic]||[]).push(c));
+  const groups=Object.values(by).map(q=>{
+    const bands=[[],[],[],[]];
+    q.forEach(c=>bands[cardRank(c,cm)].push(c));
+    return [].concat(...bands.map(shuffle));
+  });
+  return strideMerge(groups,src.length);
+}
+/* In memory only — a deck is a sitting, not saved progress. */
+const DECK={};
+const deckKey=t=>Array.isArray(t)?t.join('+'):t;
+const deckSig=()=>[S.door,S.topic,S.crit].join('|');
+function nextCard(types){
+  const k=deckKey(types), sig=deckSig();
+  let d=DECK[k];
+  if(!d||d.sig!==sig||d.i>=d.cards.length) d=DECK[k]={cards:buildDeck(types),i:0,sig};
+  return d.cards.length?d.cards[d.i++]:null;
+}
+/* A missed card comes back inside the same sitting rather than waiting a whole
+   pass. Again lands sooner than Hard. */
+function requeue(types,card,gap){
+  const d=DECK[deckKey(types)];
+  if(!d||!card) return;
+  d.cards.splice(Math.min(d.i+gap,d.cards.length),0,card);
+}
+/* Composition of the current deck, for the door note. Reports, never filters. */
+function deckStats(types){
+  const cm={}; (PACK.criteria||[]).forEach(c=>cm[c.id]=c);
+  const src=deckSource(types);
+  return {total:src.length, hot:src.filter(c=>cardRank(c,cm)===0).length,
+          weak:src.filter(c=>cardRank(c,cm)===1).length};
 }
 /* per-topic readiness, or null when there is genuinely no data to report */
 function topicReady(tid){
@@ -624,7 +1185,7 @@ function topicReady(tid){
   const seen=rec.filter(c=>srsGet(c.key).seen>0).length;
   if(!seen&&!acc) return null;
   const parts=[];
-  if(rec.length) parts.push(rec.filter(c=>srsGet(c.key).box>=2).length/rec.length);
+  if(seen) parts.push(rec.filter(c=>srsGet(c.key).box>=2).length/rec.length);   // same null-is-not-zero rule as critMastery
   if(acc) parts.push(acc.pct/100);
   return parts.length?Math.round(parts.reduce((a,b)=>a+b,0)/parts.length*100):null;
 }
@@ -637,26 +1198,38 @@ function chipRow(cb){
   setTimeout(()=>$$('.chip').forEach(c=>c.onclick=()=>{S.topic=c.dataset.t;save();cb();}),0);
   return html;
 }
-function gate(cb,types){
-  const P=S.door==='ready'?priorityPool(types):null;
+/* `readyNote` lets a view describe its own "Get me ready" behaviour. The Brief
+   orders the focus points rather than drawing a card queue, so the card-count note
+   would be meaningless there. */
+function gate(cb,types,readyNote){
+  const P=(S.door==='ready'&&readyNote===undefined)?deckStats(types):null;
   const html=`<div class="doors">
       <button class="door ${S.door==='ready'?'on':''}" data-d="ready">🎯 Get me ready</button>
       <button class="door ${S.door==='pick'?'on':''}" data-d="pick">🗂 I'll pick</button>
-      <button class="iconbtn" id="doorWhy" title="How this queue is chosen">?</button>
+      <button class="iconbtn" id="doorWhy" title="What the difference is">?</button>
     </div>
     <div id="doorHelp"></div>
-    ${P?`<div class="doornote">${TIERMSG[P.tier]} <b>${P.pool.length}</b> of ${P.total} cards are in this queue — switch to <b>I'll pick</b> for the rest.</div>`:''}`;
+    ${S.door!=='ready'?'':readyNote!==undefined?readyNote
+      :P?`<div class="doornote">All <b>${P.total}</b> cards are in the rotation — the order just puts the most useful first.${
+          P.hot?` <b>${P.hot}</b> of them have either been asked on a past quiz or cover parts of the course no practice test touches, so they lead.`:''}${
+          P.weak?` Then the <b>${P.weak}</b> you have been getting wrong.`:''} Nothing is held back.</div>`:''}`;
   setTimeout(()=>{
+    // Pre-existing race: this fires a tick after render, and switching tabs quickly
+    // replaces the view before it runs, so the elements are gone. Guard rather than throw.
+    if(!$('#doorWhy')) return;
     $$('.door').forEach(b=>b.onclick=()=>{ S.door=b.dataset.d; save(); cb(); });
     $('#doorWhy').onclick=()=>{
       const h=$('#doorHelp');
       h.innerHTML = h.innerHTML ? '' : `<div class="doorhelp">
-        <p><b>🎯 Get me ready</b> picks for you. It works down a fixed order: criteria the
-        published blueprint lists but no practice test ever covered, then anything you have
-        been getting wrong, then whatever is due for review. It only ever shows you one of
-        those layers at a time, and it tells you which one.</p>
-        <p><b>🗂 I'll pick</b> gives you the topics and gets out of the way. Same cards —
-        nothing is hidden behind the other door.</p>
+        <p><b>Both doors hold exactly the same cards.</b> The only difference is who
+        decides what you see next.</p>
+        <p><b>🎯 Get me ready</b> decides for you. You still get through every card —
+        it just leads with the ones that have come up on a past quiz, and the parts of
+        the course no practice test covers. Then the ones you keep getting wrong.</p>
+        <p><b>🗂 I'll pick</b> hands you the topics and gets out of the way.</p>
+        <p>Either way you will not meet the same card twice until you have been through
+        the whole set — except the ones you get wrong, which come back a few cards later
+        on purpose.</p>
         ${PACK.doorNote?`<p>${PACK.doorNote}</p>`:''}
         ${PACK.sources?`<p style="border-top:1px solid var(--line);padding-top:9px;margin-top:9px"><b>Where this content comes from.</b> ${PACK.sources}</p>`:''}</div>`;
     };
@@ -664,22 +1237,190 @@ function gate(cb,types){
   return html+(S.door==='pick'?chipRow(cb):'');
 }
 
+/* ============================== Brief ==============================
+   The exposition layer. Every other view asks a question; this is the only
+   one that explains anything, and without it Learn is asking a reader to
+   retrieve facts they were never given a chance to encode.
+
+   It is DERIVED, not authored. The teaching material is already in the pack:
+   flash answers written in teaching order underneath named criteria. This
+   view simply renders them as prose instead of as questions.            */
+const HASBRIEF=()=>!!(PACK.criteria&&PACK.criteria.length);
+S.read=S.read||{};                 // critId -> timestamp. Additive: no migration needed.
+/* cardKey -> {g,t}: marking points you ticked, out of the total. The SRS box alone
+   cannot carry this — it records how WELL you recalled something, not how many marks
+   you took — and the mark projection needs the written half in marks, like the paper.
+   Additive, so an existing save picks it up empty and fills as you go. */
+S.saq=S.saq||{};
+
+/* Cards never change at runtime, so the key/criterion joins are computed once.
+   Without this the Brief recomputes ckey() ~67k times per render on a 587-card
+   pack, which is visible on a phone. */
+let _ALL=null;
+const allCards=()=>_ALL||(_ALL=PACK.cards.map((c,i)=>({...c,key:ckey(c),idx:i})));
+const _ccache={}, _tcache={};
+function critCards(id){
+  if(!_ccache[id]) _ccache[id]=allCards().filter(c=>c.crit===id||(c.alsoCrit||[]).includes(id));
+  return _ccache[id];
+}
+/* A criterion's home topic is whichever topic most of its cards sit in. Criteria
+   routinely straddle topics (19 of hs2-test1's 38 do), so this is a filter hint
+   only — the Brief always renders in blueprint order and never regroups. */
+function critTopic(id){
+  if(_tcache[id]===undefined){
+    const n={}; critCards(id).forEach(c=>n[c.topic]=(n[c.topic]||0)+1);
+    const top=Object.entries(n).sort((a,b)=>b[1]-a[1])[0];
+    _tcache[id]=top?top[0]:null;
+  }
+  return _tcache[id];
+}
+/* Prose comes from flash answers, in pack order. A criterion with no flash card
+   at all — hs2-test1's case studies are 14 SAQs and nothing else — falls back to
+   its SAQ marking points, which are the model answer and read fine as prose. */
+function critProse(id){
+  const cs=critCards(id), fl=cs.filter(c=>c.type==='flash');
+  return fl.length?fl:cs.filter(c=>c.type==='saq');
+}
+/* Null means "no data", and that is a different thing from zero.
+   The recall half only counts once there IS recall history. Without that guard any
+   focus point holding a flash card reports 0% the moment the tool opens, so one
+   nobody has touched is indistinguishable from one attempted and failed — the Brief's
+   "not drilled yet" never appeared, and the readiness readout called untouched
+   material "your weakest so far". */
+function critMastery(id){
+  const cs=critCards(id); if(!cs.length) return null;
+  const rec=cs.filter(isRecall), a=autoAcc(cs), parts=[];
+  if(rec.some(c=>srsGet(c.key).seen>0)) parts.push(rec.filter(c=>srsGet(c.key).box>=2).length/rec.length);
+  if(a) parts.push(a.pct/100);
+  return parts.length?parts.reduce((x,y)=>x+y,0)/parts.length:null;
+}
+/* Get me ready SORTS the blueprint; it never hides part of it. That is deliberate:
+   the card queue's priority tiers are a hard filter, and on this pack that starves
+   three topics to zero. Ranking here changes the order and nothing else. */
+function critRank(cr){
+  const read=!!S.read[cr.id], m=critMastery(cr.id);
+  if(cr.blind&&!read) return 0;
+  if(!read&&(m==null||m<0.6)) return 1;
+  if(!read) return 2;
+  return 3;
+}
+function factHTML(c){
+  const body=c.type==='flash'
+    ? `<div class="facta">${c.a}</div>`
+    : `<ul class="factpts">${(c.points||[]).map(p=>`<li>${p}</li>`).join('')}</ul>`;
+  return `<div class="fact"><div class="factq">${c.q}${provHTML(c)}</div>${body}${figHTML(c)}<div class="provslot"></div></div>`;
+}
+
+function renderBrief(){
+  const all=PACK.criteria||[];
+  const pos={}; all.forEach((c,i)=>pos[c.id]=i);
+  const G=gate(renderBrief,RECALL,`<div class="doornote">Everything is here under either door — <b>Get me ready</b> only changes the <b>order</b>, putting the parts no practice test covers, and the parts you are weakest on, first. Nothing is hidden.</div>`);
+
+  let list=all.slice();
+  if(S.door==='ready') list.sort((a,b)=>critRank(a)-critRank(b)||pos[a.id]-pos[b.id]);
+  else if(S.topic!=='all') list=list.filter(c=>critTopic(c.id)===S.topic);
+
+  const nRead=all.filter(c=>S.read[c.id]).length;
+  const tiers={};
+  list.forEach(cr=>critProse(cr.id).forEach(c=>{ if(c.tier) tiers[c.tier]=(tiers[c.tier]||0)+1; }));
+  const nProse=Object.values(tiers).reduce((a,b)=>a+b,0);
+
+  view.innerHTML=G+`
+    <div class="brfbar"><b id="brfProg">${nRead} of ${all.length} read</b>
+      <span class="bar"><i id="brfProgBar" style="width:${all.length?nRead/all.length*100:0}%"></i></span></div>
+    <div class="legend">
+      <b>Read this before you drill.</b> One section per focus point, in the order the course
+      publishes them. Read a section, mark it read, then hit <b>▸ Drill this</b> to be
+      questioned on just that one.
+      ${nProse?`<br/><br/>Each fact says where it came from. <b>📄 From a past quiz</b> is the one
+      to watch for — that fact has already been asked${tiers.verbatim?` (${tiers.verbatim} of the ${nProse} below)`:''}.
+      ${tiers.textbook?`Most of the rest is <b>background reading</b>: standard physiology put here so the
+      examinable facts have something to sit on, cross-checked against the module hub. It is unlikely
+      to come back at you word for word — it is what makes the examinable parts make sense. Tap any
+      badge to see the source.`:'Tap any badge to see the source.'}`:''}
+    </div>
+    ${list.length?list.map(cr=>{
+      const prose=critProse(cr.id), cs=critCards(cr.id), read=!!S.read[cr.id];
+      const tp=critTopic(cr.id), m=critMastery(cr.id);
+      return `<div class="brf${read?' read':''}" id="brf-${cr.id}" data-crit="${cr.id}">
+        <div class="brfhead"><span class="cn">${pos[cr.id]+1}/${all.length}</span>
+          <h3>${esc(cr.name||cr.id)}</h3>${cr.blind?`<span class="blindtag">never practised</span>`:''}</div>
+        <div class="brfsub">${tp?esc(topicName(tp))+' · ':''}${cs.length} card${cs.length===1?'':'s'} · ${
+          m!=null?`${Math.round(m*100)}% mastered`:'not drilled yet'}</div>
+        ${prose.length?prose.map(factHTML).join('')
+          :`<div class="hinttxt">No written summary for this one yet — go straight to drilling it.</div>`}
+        <div class="brfact">
+          <button class="btn ghost" data-read="${cr.id}">${read?'✓ Read':'Mark as read'}</button>
+          <button class="btn primary" data-drill="${cr.id}">▸ Drill this</button>
+        </div></div>`;
+    }).join('')
+    :`<div class="empty">No focus points in this topic.</div>`}`;
+
+  /* Ticking "read" repaints in place — re-rendering 38 sections would throw away
+     the reader's scroll position, which on a long page is the whole experience. */
+  $$('[data-read]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.read, on=!S.read[id];
+    if(on) S.read[id]=Date.now(); else delete S.read[id];
+    save();
+    b.textContent=on?'✓ Read':'Mark as read';
+    const blk=view.querySelector(`.brf[data-crit="${id}"]`); if(blk) blk.classList.toggle('read',on);
+    const n=all.filter(c=>S.read[c.id]).length;
+    const pr=$('#brfProg'), pb=$('#brfProgBar');
+    if(pr) pr.textContent=`${n} of ${all.length} read`;
+    if(pb) pb.style.width=(all.length?n/all.length*100:0)+'%';
+  });
+  $$('[data-drill]').forEach(b=>b.onclick=()=>{ S.crit=b.dataset.drill; save(); nav('learn'); window.scrollTo({top:0}); });
+}
+
+/* ---- criterion scope, set by the Brief's ▸ Drill this ----
+   Always announced with a one-tap clear. A filter the reader cannot see is a
+   lock, and the house rule is that we never lock. */
+function scopeBanner(){
+  if(!S.crit) return '';
+  const cr=(PACK.criteria||[]).find(c=>c.id===S.crit);
+  return `<div class="scopebar">Focused on <b>${esc(cr?(cr.name||cr.id):S.crit)}</b><button id="scopeClr">Clear ✕</button></div>`;
+}
+/* Delegated rather than wired per render. The other post-render wiring in this file
+   binds on a setTimeout and is documented as racy; here that race would leave the
+   reader inside a scope with no way out — a lock, which the two-doors rule forbids.
+   Delegation cannot come unbound. */
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#scopeClr')) return;
+  S.crit=null; save(); nav(VIEW);
+});
+/* "→ Read the full explanation" — the return leg of ▸ Drill this. Delegated for the
+   same reason: this is the one route out of a wrong answer and into the prose, and a
+   racy per-render binding would silently drop it.
+
+   The topic filter is cleared FIRST when it would hide the section being asked for.
+   Landing in a Brief that does not contain the thing the reader just clicked is worse
+   than the extra reset, and the topic chips sit right there showing what changed, so
+   it is visible rather than silent. The focus scope is left alone — they are likely
+   to go back to drilling it. */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-brief]'); if(!b) return;
+  const id=b.dataset.brief;
+  if(S.door==='pick'&&S.topic!=='all'&&critTopic(id)!==S.topic){ S.topic='all'; save(); }
+  nav('brief');
+  const el=document.getElementById('brf-'+id);
+  if(el){ el.scrollIntoView({block:'start',behavior:'smooth'}); el.classList.add('lit'); setTimeout(()=>el.classList.remove('lit'),1800); }
+  else window.scrollTo({top:0});
+});
+const critScope=cs=>S.crit?cs.filter(c=>c.crit===S.crit||(c.alsoCrit||[]).includes(S.crit)):cs;
+
 /* ---- Learn (flash + saq as flip cards with SRS) ---- */
 function renderLearn(){
-  const G=gate(renderLearn,RECALL);
-  const pool=S.door==='ready'?priorityPool(RECALL).pool:duePool(S.topic);
-  if(!pool.length){ view.innerHTML=G+`<div class="empty">No cards in this topic yet.</div>`; return; }
-  CUR=pool[Math.floor(Math.random()*pool.length)];
-  const st=srsGet(CUR.key);
+  const G=gate(renderLearn,RECALL)+scopeBanner();
+  CUR=nextCard(RECALL);
+  if(!CUR){ view.innerHTML=G+`<div class="empty">No cards in this topic yet.</div>`; return; }
   view.innerHTML=G+`
     <div class="card">
-      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">box ${st.box+1}/5</span><span class="tag right">learn</span></div>
-      <div class="q">${CUR.q}</div>
+      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span>${provHTML(CUR)}<span class="tag right">learn</span></div>
+      <div class="q">${CUR.q}</div><div class="provslot"></div>
       ${figHTML(CUR)}
       ${CUR.type==='saq'?`<div class="marks">${cardMarks(CUR)} marks — say your answer out loud, then flip.</div>`:''}
       <div id="ansZone"><div class="btnrow"><button class="btn primary" id="flip">Show answer ↵</button></div></div>
     </div>`;
-  speak(CUR.q);
   $('#flip').onclick=flipLearn;
   document.onkeydown=e=>{ if(VIEW==='learn'&&e.key==='Enter'&&$('#flip')) flipLearn(); };
 }
@@ -695,26 +1436,28 @@ function flipLearn(){
       <button class="r3" data-r="2">Good</button>
       <button class="r4" data-r="3">Easy</button>
     </div>`;
-  speak(c.type==='flash'?c.a:c.points.join('. '));
-  $$('.rate button').forEach(b=>b.onclick=()=>{ srsRate(c.key,+b.dataset.r); renderLearn(); });
+  $$('.rate button').forEach(b=>b.onclick=()=>{
+    const r=+b.dataset.r;
+    srsRate(c.key,r);
+    if(r<=1) requeue(RECALL,c,r===0?4:10);   // Again comes back sooner than Hard
+    renderLearn();
+  });
 }
 
 /* ---- Drill: every auto-marked type (mcq / order / cloze / tfset / match) ---- */
 function renderDrill(){
-  const G=gate(renderDrill,AUTO);
-  const pool=S.door==='ready'?priorityPool(AUTO).pool:cardsOf(AUTO,S.topic);
-  if(!pool.length){ view.innerHTML=G+`<div class="empty">No drillable questions in this topic yet.</div>`; return; }
-  CUR=pool[Math.floor(Math.random()*pool.length)];
+  const G=gate(renderDrill,AUTO)+scopeBanner();
+  CUR=nextCard(AUTO);
+  if(!CUR){ view.innerHTML=G+`<div class="empty">No questions in this topic yet.</div>`; return; }
   const r=makeRunner(CUR), tot=cardMarks(CUR);
   view.innerHTML=G+`
     <div class="card">
-      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">${tot} mark${tot>1?'s':''}</span><span class="tag right">${TYPELABEL[CUR.type]}</span></div>
-      <div class="q">${CUR.q}</div>
+      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">${tot} mark${tot>1?'s':''}</span>${provHTML(CUR)}<span class="tag right">${TYPELABEL[CUR.type]}</span></div>
+      <div class="q">${CUR.q}</div><div class="provslot"></div>
       ${figHTML(CUR)}
       <div id="body">${runnerHTML(r)}</div>
       <div id="fb">${CUR.type==='mcq'?'':`<div class="btnrow"><button class="btn primary" id="submit" disabled>Check answer ↵</button></div>`}</div>
     </div>`;
-  speak(CUR.q);
   const refresh=()=>{
     if(CUR.type==='order'){ $('#body').innerHTML=runnerHTML(r); wireRunner($('#body'),r,refresh); }
     const sb=$('#submit'); if(sb) sb.disabled=!runnerDone(r);
@@ -726,8 +1469,9 @@ function renderDrill(){
     $('#body').innerHTML=runnerHTML(r);
     const m=S.mcq[CUR.key]||{a:0,c:0}; m.a++; if(ok)m.c++;
     m.g=(m.g||0)+got; m.t=(m.t||0)+tot; S.mcq[CUR.key]=m; save();
-    $('#fb').innerHTML=`<div class="why">${ok?'✅':got?'➖':'❌'} <b>${got} / ${tot} marks.</b> ${CUR.why||''}</div>${srcHTML(CUR)}
-      <div class="btnrow"><button class="btn primary" id="next">Next ↵</button></div>`;
+    if(!ok) requeue(AUTO,CUR,got?10:4);      // partly right waits longer than fully wrong
+    $('#fb').innerHTML=feedbackHTML(CUR,r.resp,`${ok?'✅':got?'➖':'❌'} <b>${got} / ${tot} mark${tot>1?'s':''}.</b> `)+srcHTML(CUR)+
+      `<div class="btnrow"><button class="btn primary" id="next">Next ↵</button></div>`;
     $('#next').onclick=renderDrill;
     document.onkeydown=e=>{ if(VIEW==='mcq'&&e.key==='Enter'&&$('#next')) renderDrill(); };
   };
@@ -736,21 +1480,22 @@ function renderDrill(){
   document.onkeydown=e=>{ if(VIEW==='mcq'&&e.key==='Enter'&&$('#submit')&&!$('#submit').disabled) grade(); };
 }
 
-/* ---- SAQ marked drill ---- */
+/* ---- Written: the questions you answer in prose and mark yourself ---- */
 function renderSaq(){
-  const G=gate(renderSaq,'saq');
-  const pool=S.door==='ready'?priorityPool('saq').pool:cardsOf('saq',S.topic);
-  if(!pool.length){ view.innerHTML=G+`<div class="empty">No marked questions in this topic yet.</div>`; return; }
-  CUR=pool[Math.floor(Math.random()*pool.length)];
+  const G=gate(renderSaq,'saq')+scopeBanner();
+  CUR=nextCard('saq');
+  if(!CUR){ view.innerHTML=G+`<div class="empty">No written questions in this topic yet.</div>`; return; }
   view.innerHTML=G+`
     <div class="card">
-      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">${cardMarks(CUR)} marks</span><span class="tag right">marked drill</span></div>
-      <div class="q">${CUR.q}</div>
+      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">${cardMarks(CUR)} marks</span>${provHTML(CUR)}<span class="tag right">written answer</span></div>
+      <div class="q">${CUR.q}</div><div class="provslot"></div>
       ${figHTML(CUR)}
-      <div class="hinttxt">Write or say your full answer first — then reveal and mark yourself honestly.</div>
+      <!-- The one place "SAQ" is glossed. A student does meet the abbreviation in the
+           course, so hiding it entirely would be its own confusion — but they should
+           meet it here, once, next to the plain words, and not on first contact. -->
+      <div class="hinttxt">These are the written questions — the ones the course calls <b>SAQs</b>. Write or say your full answer first, then reveal the marking points and mark yourself honestly.</div>
       <div id="ansZone"><div class="btnrow"><button class="btn primary" id="flip">Reveal marking points ↵</button></div></div>
     </div>`;
-  speak(CUR.q);
   const reveal=()=>{
     $('#ansZone').innerHTML=`
       <div class="answer"><div class="lab">Tick every point you got</div>
@@ -761,8 +1506,10 @@ function renderSaq(){
     $('#done').onclick=()=>{
       const got=$$('#pts li.got').length, tot=CUR.points.length;
       const pct=got/tot;
+      const sm=S.saq[CUR.key]||{g:0,t:0}; sm.g+=got; sm.t+=tot; S.saq[CUR.key]=sm;
       srsRate(CUR.key, pct>=1?3 : pct>=0.8?2 : pct>=0.5?1 : 0);
-      $('#done').outerHTML=`<div class="why" style="flex:1">Scored <b>${got}/${tot}</b> — ${pct>=0.8?'strong ✅':pct>=0.5?'getting there — this card will come back soon':'this card goes back to box 1 🔁'}</div><button class="btn primary" id="next">Next ↵</button>`;
+      if(pct<0.8) requeue('saq',CUR,pct>=0.5?10:4);
+      $('#done').outerHTML=`<div class="why" style="flex:1">Scored <b>${got}/${tot}</b> — ${pct>=0.8?'strong ✅':pct>=0.5?'getting there — this one comes back soon':'this one goes back to the front of the queue 🔁'}</div><button class="btn primary" id="next">Next ↵</button>`;
       $('#next').onclick=renderSaq;
       document.onkeydown=e=>{ if(VIEW==='saq'&&e.key==='Enter'&&$('#next')) renderSaq(); };
     };
@@ -771,10 +1518,10 @@ function renderSaq(){
   document.onkeydown=e=>{ if(VIEW==='saq'&&e.key==='Enter'&&$('#flip')) reveal(); };
 }
 
-/* ---- Exam sim ---- */
+/* ---- Mock test ---- */
 const examEligible=c=>c.lean!=='exam';          // cards flagged as final-exam-only sit out
 const blindCrits=()=>new Set((PACK.criteria||[]).filter(c=>c.blind).map(c=>c.id));
-function drawPool(cards){                        // blind-spot criteria get 2× weight until nailed
+function drawPool(cards){                        // never-practised focus points get 2× weight until nailed
   const bc=blindCrits(), out=[];
   cards.forEach(c=>{ out.push(c);
     const m=S.mcq[c.key], mastered=m&&m.t&&m.g/m.t>=1;
@@ -793,7 +1540,12 @@ function drawAuto(n,mix){
     out=out.concat(takeUnique(drawPool(sub),Math.min(Math.round(n*mix[t]),sub.length)));
   }
   if(out.length<n){ const have=new Set(out.map(c=>c.key));
-    out=out.concat(takeUnique(drawPool(elig.filter(c=>!have.has(c.key))),n-out.length)); }
+    // When a pack DECLARES a mix, the top-up must stay inside it. Filling from every
+    // eligible type let card types the pack had deliberately left out of the mix back
+    // into the exam — hs2-test1 excludes `order` because no ordering question exists on
+    // the real paper, and the fallback would have quietly reintroduced it.
+    const pool=mix?elig.filter(c=>mix[c.type]!=null):elig;
+    out=out.concat(takeUnique(drawPool(pool.filter(c=>!have.has(c.key))),n-out.length)); }
   return out.slice(0,n);
 }
 function renderExamSetup(){
@@ -804,11 +1556,14 @@ function renderExamSetup(){
   const last=S.exams[0];
   view.innerHTML=`
     <div class="card setup">
-      <h3>🎯 Exam simulation</h3>
-      <p><b>${nA}</b> auto-marked + <b>${nS}</b> written questions, all topics mixed${cfg.minutes?`, <b>${cfg.minutes} min</b> timer`:''}. No feedback until the end. Pass mark <b>${cfg.pass}%</b>.</p>
+      <h3>🎯 Mock test</h3>
+      <p>A full practice run under the real conditions: <b>${nA}</b> marked-for-you + <b>${nS}</b> written questions, every topic mixed${cfg.minutes?`, <b>${cfg.minutes} minutes</b> on the clock`:''}. Nothing is marked until the end. Marked ${passPhrase()}.</p>
+      ${PASSTARGET()?`<p style="font-size:12.5px;color:var(--tx3);margin:-8px 0 14px">${passCaveat()}</p>`:''}
       ${cfg.noPaper?`<div class="packwarn">✋ <b>No rough paper.</b> That's the real condition — work the multi-step questions in your head, not on a pad.</div>`:''}
-      ${nA+nS>0?`<button class="bigstart" id="start">START EXAM</button>`:`<div class="empty">This pack has no drillable or marked cards yet — the exam sim needs at least one.</div>`}
+      ${nA+nS>0?`<button class="bigstart" id="start">START THE MOCK TEST</button>`:`<div class="empty">This pack has no questions to sit yet — a mock test needs at least one.</div>`}
       ${last?`<p style="margin:12px 0 0;text-align:center">Last attempt: <b>${last.score}%</b> ${last.pass?'✅':'❌'}</p>`:''}
+      ${PACK.exam&&PACK.exam.date&&daysLeft()!=null&&daysLeft()>=0?`<p style="margin:8px 0 0;text-align:center;font-size:12.5px;color:var(--tx3)">${
+        daysLeft()===0?'The real one is today.':daysLeft()===1?'The real one is tomorrow.':`${daysLeft()} days until the real one.`}</p>`:''}
     </div>`;
   if(nA+nS===0) return;
   $('#start').onclick=()=>{
@@ -884,10 +1639,18 @@ function renderExamReview(){
 function examResults(){
   const got=EX.marks.reduce((a,m)=>a+m.got,0), tot=EX.marks.reduce((a,m)=>a+m.tot,0);
   const score=Math.round(got/tot*100), pass=score>=(EX.cfg.pass||80);
+  /* Written answers self-marked in the mock test count toward the mark projection
+     exactly as the ones in the Written view do — the projection would otherwise say
+     "no written answers at all" to someone who has just sat a full paper. Guarded on
+     ticks so a run abandoned before the self-mark screen records nothing. */
+  EX.qs.forEach((q,i)=>{ const m=EX.marks[i];
+    if(q.type!=='saq'||!m||!m.ticks||!m.ticks.length) return;
+    const sm=S.saq[q.key]||{g:0,t:0}; sm.g+=m.got; sm.t+=m.tot; S.saq[q.key]=sm; });
   S.exams.unshift({d:new Date().toISOString().slice(0,10),score,pass}); S.exams=S.exams.slice(0,12); save();
   view.innerHTML=`
     <div class="result-hero ${pass?'pass':'fail'}"><div class="big">${score}%</div>
-      <div class="sub"><b>${got} / ${tot}</b> marks · pass ${EX.cfg.pass||80}% — ${pass?'<b>PASSED</b> 🎉':'keep drilling — the review below is where the marks are.'}</div></div>
+      <div class="sub"><b>${got} / ${tot}</b> marks · ${passWord()} ${EX.cfg.pass||80}% — ${
+        pass?(PASSTARGET()?'<b>TARGET MET</b> 🎉':'<b>PASSED</b> 🎉'):'keep drilling — the review below is where the marks are.'}</div></div>
     ${EX.qs.map((q,i)=>{
       const m=EX.marks[i], ic=m.got===m.tot?'✅':m.got?'➖':'❌';
       const head=`<div class="rhead" data-i="${i}"><span class="ic">${ic}</span><span class="qq">${q.q}</span><span style="font-weight:800">${m.got}/${m.tot}</span></div>`;
@@ -895,9 +1658,9 @@ function examResults(){
         <div class="rbody hidden" id="rb${i}"><ul class="points">${q.points.map((p,k)=>`<li class="${m.ticks[k]?'got':''}"><span class="n">${k+1}</span><span>${p}</span></li>`).join('')}</ul></div></div>`;
       const r=makeRunner(q,EX.resp[i]); r.rev=true;
       return `<div class="rev">${head}
-        <div class="rbody hidden" id="rb${i}">${figHTML(q)}${runnerHTML(r)}${q.why?`<div class="why">${q.why}</div>`:''}</div></div>`;
+        <div class="rbody hidden" id="rb${i}">${figHTML(q)}${runnerHTML(r)}${feedbackHTML(q,EX.resp[i])}</div></div>`;
     }).join('')}
-    <div class="btnrow"><button class="btn primary" id="again">Run it again</button><button class="btn ghost" id="toStats">Stats</button></div>`;
+    <div class="btnrow"><button class="btn primary" id="again">Run it again</button><button class="btn ghost" id="toStats">Progress</button></div>`;
   $$('.rhead[data-i]').forEach(h=>h.onclick=()=>{const b=$('#rb'+h.dataset.i); if(b)b.classList.toggle('hidden');});
   $('#again').onclick=renderExamSetup;
   $('#toStats').onclick=()=>nav('stats');
@@ -946,33 +1709,114 @@ function autoAcc(cards){
     a+=m.a; g+=(m.g!=null?m.g:m.c); t+=(m.t!=null?m.t:m.a); });   // legacy records fall back to c/a
   return t?{pct:Math.round(g/t*100),tries:a}:null;
 }
+/* ---- readiness, in the only unit that matters ---------------------------------
+   What this replaces, and why it is not a rename. Progress used to report "cards in
+   box 3+", "drill accuracy 62%" and "last exam 71%". A Leitner box is an internal
+   detail of the scheduler, and none of the three answers the question the reader
+   actually has, which is: *am I going to pass, and where do the next forty minutes
+   go?* Relabelling "box 3+" as "Mastered" would have produced a nicer-sounding number
+   that still answered the wrong question.
+
+   So it is a mark projection, built only from questions actually attempted — nothing
+   is assumed about material never touched — with the two halves weighted by their
+   real share of the paper, taken from the pack's own declared composition. Per the
+   self-explaining-UI rule it says what it is standing on, and below a usable sample
+   it refuses to show a number at all rather than dress a guess up as a prediction. */
+function paperWeights(){
+  const cfg=Object.assign({auto:10,saq:2,pass:80},PACK.exam||{});
+  if(cfg.mcq!=null&&cfg.auto==null) cfg.auto=cfg.mcq;         // legacy packs
+  const mean=t=>{ const cs=PACK.cards.filter(c=>c.type===t);
+    return cs.length?cs.reduce((a,c)=>a+cardMarks(c),0)/cs.length:0; };
+  let autoM=0;
+  if(cfg.mix){ for(const t in cfg.mix) autoM+=cfg.auto*cfg.mix[t]*mean(t); }
+  else{ const ms=AUTO.map(mean).filter(Boolean); autoM=cfg.auto*(ms.length?ms.reduce((a,b)=>a+b,0)/ms.length:1); }
+  const saqM=cfg.saq*mean('saq'), tot=autoM+saqM;
+  return {auto:tot?autoM/tot:1, saq:tot?saqM/tot:0, pass:cfg.pass};
+}
+function predict(cards){
+  const w=paperWeights();
+  let ag=0,at=0,sg=0,st=0,na=0,ns=0;
+  cards.forEach(c=>{
+    if(isAuto(c)){ const m=S.mcq[c.key]; if(m&&(m.t||m.a)){ ag+=(m.g!=null?m.g:m.c); at+=(m.t!=null?m.t:m.a); na++; } }
+    else if(c.type==='saq'){ const m=S.saq[c.key]; if(m&&m.t){ sg+=m.g; st+=m.t; ns++; } }
+  });
+  const parts=[];
+  if(at) parts.push([w.auto, ag/at]);
+  if(st) parts.push([w.saq,  sg/st]);
+  const wsum=parts.reduce((a,p)=>a+p[0],0);
+  if(!wsum) return {n:0, pass:w.pass};
+  return {pct:Math.round(100*parts.reduce((a,p)=>a+p[0]*p[1],0)/wsum),
+          pass:w.pass, n:na+ns, nAuto:na, nSaq:ns,
+          /* how much of the paper this projection actually stands on: the marks-share
+             of the halves that have any data behind them at all */
+          cover:Math.round(100*wsum)};
+}
+/* Where the next block of time goes. Never-touched focus points sort first — an
+   unknown is worth more than a known weakness — and the row says which it is. */
+function weakest(k){
+  return (PACK.criteria||[]).map(cr=>({cr,n:critCards(cr.id).length,m:critMastery(cr.id)}))
+    .filter(x=>x.n).sort((a,b)=>(a.m==null?-1:a.m)-(b.m==null?-1:b.m)).slice(0,k);
+}
 function renderStats(){
-  const recall=PACK.cards.map(c=>({...c,key:ckey(c)})).filter(isRecall);
-  const learned=recall.filter(c=>srsGet(c.key).box>=2).length;
-  const acc=autoAcc(PACK.cards.map(c=>({...c,key:ckey(c)})));
-  view.innerHTML=`
+  const all=allCards();
+  const recall=all.filter(isRecall);
+  const solid=recall.filter(c=>srsGet(c.key).box>=2).length;
+  const p=predict(all);
+  /* Two thresholds, both deliberately conservative. Under 20 attempts there is no
+     number — a confident 58% built on nine questions is worse than saying nothing.
+     Under 60, or with only one half of the paper attempted, it shows but says plainly
+     that it is a guess. */
+  const solidEnough = p.n>=60 && p.nAuto && p.nSaq;
+  const showable    = p.n>=20;
+  const hero = !showable
+    ? `<div class="result-hero"><div class="big" style="font-size:26px">Not enough yet</div>
+        <div class="sub">Answer <b>${20-p.n}</b> more question${20-p.n===1?'':'s'} in Drill or Written and a projected mark appears here. Guessing from ${p.n||'no'} answer${p.n===1?'':'s'} would just be making something up.</div></div>`
+    : `<div class="result-hero ${p.pct>=p.pass?'pass':'fail'}"><div class="big">${p.pct}%</div>
+        <div class="sub">${solidEnough?'Projected mark':'Rough guess at your mark'} · ${passPhrase()} —
+          ${p.pct>=p.pass?'<b>you are over the line</b> on what you have done so far':'<b>below the line</b> on what you have done so far'}</div></div>
+       ${PASSTARGET()?`<div class="doornote" style="border-left-color:var(--line2)">${passCaveat()}</div>`:''}
+       <div class="doornote">${solidEnough
+          ? `Worked out from the <b>${p.n}</b> questions you have answered, weighted the way the real paper weights its marks. It assumes the rest of the material goes like the part you have done — so it moves as you cover more ground.`
+          : `⚠️ <b>This is a guess, not a prediction.</b> It is standing on <b>${p.n}</b> answered question${p.n===1?'':'s'}${p.nSaq?'':' and no written answers at all'}, which is nowhere near enough to be trusted. Keep going and it becomes real.`}</div>`;
+
+  const weak=weakest(3);
+  view.innerHTML=hero+`
     <div class="statgrid">
-      <div class="stat"><div class="n">${learned}/${recall.length}</div><div class="l">cards in box 3+</div></div>
-      <div class="stat"><div class="n">${acc?acc.pct+'%':'—'}</div><div class="l">${acc?'drill accuracy':'no attempts yet'}</div></div>
-      <div class="stat"><div class="n">${S.exams.length?S.exams[0].score+'%':'—'}</div><div class="l">${S.exams.length?'last exam':'no exam sat yet'}</div></div>
+      <div class="stat"><div class="n">${solid}<span style="font-size:15px;color:var(--tx3)">/${recall.length}</span></div><div class="l">recalled right, twice over</div></div>
+      <div class="stat"><div class="n">${p.nAuto?p.nAuto:'—'}</div><div class="l">${p.nAuto?'questions drilled':'nothing drilled yet'}</div></div>
+      <div class="stat"><div class="n">${S.exams.length?S.exams[0].score+'%':'—'}</div><div class="l">${S.exams.length?'last mock test':'no mock test yet'}</div></div>
     </div>
+    ${weak.length?`<h2 class="sec">Where the next half hour goes</h2>
+      ${weak.map(x=>`<div class="catstat"><div class="top"><b>${esc(x.cr.name||x.cr.id)}</b><span class="m">${
+          x.m==null?'not started':Math.round(x.m*100)+'%'}</span></div>
+        <div class="bar"><i style="width:${x.m==null?0:Math.round(x.m*100)}%"></i></div>
+        <div class="sub">${x.m==null?'You have not answered anything on this one yet.':'Your weakest so far.'}
+          <button class="wlink" style="margin-top:6px" data-brief="${x.cr.id}">→ Read it in the Brief</button></div></div>`).join('')}`:''}
     <h2 class="sec">Topics</h2>
     ${PACK.topics.map(t=>{
-      const cs=PACK.cards.map(c=>({...c,key:ckey(c)})).filter(c=>c.topic===t.id);
+      const cs=all.filter(c=>c.topic===t.id);
       const recTot=cs.filter(isRecall).length;
       const rec=cs.filter(c=>isRecall(c)&&srsGet(c.key).box>=2).length;
       const a=autoAcc(cs);
       const pct=recTot?Math.round(rec/recTot*100):0;
       return `<div class="catstat"><div class="top">${t.icon} ${esc(t.name)}<span class="m">${cs.length} cards</span></div>
         <div class="bar"><i style="width:${pct}%"></i></div>
-        <div class="sub">${recTot?`${rec}/${recTot} recall cards in box 3+`:'no recall cards'}${a?` · drill ${a.pct}% (${a.tries} tries)`:' · not drilled yet'}</div></div>`;
+        <div class="sub">${recTot?`${rec} of ${recTot} recalled right twice over`:'nothing to recall here'}${a?` · ${a.pct}% of drill marks (${a.tries} tries)`:' · not drilled yet'}</div></div>`;
     }).join('')}
-    ${S.exams.length?`<h2 class="sec">Exam history</h2>${S.exams.map(e=>`<div class="histrow"><span>${e.d}</span><span class="sc">${e.score}%</span><span class="pf ${e.pass?'p':'f'}">${e.pass?'PASS':'FAIL'}</span></div>`).join('')}`:''}
+    ${S.exams.length?`<h2 class="sec">Mock tests</h2>${S.exams.map(e=>`<div class="histrow"><span>${e.d}</span><span class="sc">${e.score}%</span><span class="pf ${e.pass?'p':'f'}">${
+      PASSTARGET()?(e.pass?'ON TARGET':'UNDER'):(e.pass?'PASS':'FAIL')}</span></div>`).join('')}`:''}
     <div class="btnrow" style="margin-top:22px"><button class="btn ghost danger" id="reset">Reset all progress</button></div>`;
   $('#reset').onclick=()=>{ if(confirm('Wipe all progress for this pack?')){ localStorage.removeItem(KEY); S=load(); save(); renderStats(); } };
 }
 
-nav('learn');
+if((PACK.cards||[]).some(c=>c.tier)) $('#navAudit').hidden=false;
+if(HASBRIEF()) $('#navBrief').hidden=false;
+/* A reader with no history lands in the Brief. Learn would open by asking them to
+   retrieve a fact they have not encoded yet, which is the slowest way to start and
+   the most discouraging. Once there is any progress, Learn is the right landing. */
+const coldStart=!Object.keys(S.srs).length&&!Object.keys(S.mcq).length;
+renderOnboard();
+nav(HASBRIEF()&&coldStart?'brief':'learn');
 </script>
 <script>
 /* ===== STUDY BUS v2 (hub ⚡ engine — see estate STUDY-ENGINE-SPEC.md) =====
@@ -1044,7 +1888,7 @@ if(PACK.studybus&&PACK.id){
 const q=new URLSearchParams(location.search);
 const tp=q.get('topic'), md=q.get('mode');
 if(tp&&PACK.topics.some(t=>t.id===tp)){ S.topic=tp; save(); }
-if(md&&['learn','mcq','saq','exam','search','stats'].includes(md)) nav(md);
+if(md&&['brief','learn','mcq','saq','exam','search','stats','audit'].includes(md)) nav(md);
 else if(tp) nav(VIEW);   // re-render so the topic chip change shows
 })();
 </script>
