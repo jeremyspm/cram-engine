@@ -152,6 +152,12 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .bank button:hover:not(:disabled){border-color:var(--acc)}
 .bank button:disabled{opacity:.3;cursor:default}
 .clozebody{margin-top:14px;font-size:15.5px;line-height:2.1}
+/* Segmented long passages: each chunk is its own bounded block, so a 400-word item
+   reads as a short list instead of a wall. Purely presentational — see runnerHTML. */
+.clozebody.seg{line-height:1.95}
+.clozebody.seg .clozeseg{background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin-bottom:9px}
+.clozebody.seg .clozeseg:last-child{margin-bottom:0}
+.clozeprog{margin-top:11px;font-size:12.5px;color:var(--tx3);text-align:right;font-variant-numeric:tabular-nums}
 .blanksel{background:var(--card2);border:1px solid var(--acc);border-radius:7px;color:var(--tx);font:inherit;font-size:14px;padding:4px 6px;margin:2px 1px;max-width:100%}
 .blanksel:disabled{opacity:1}
 .blanksel.right{border-color:var(--good);background:var(--gGood)}
@@ -282,6 +288,13 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
 .door.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .doors .iconbtn{flex:0 0 auto;width:42px;height:auto;font-weight:800}
 .doornote{font-size:12.5px;color:var(--tx2);background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
+/* The background-reading switch. Column-stacked so the button never gets squeezed to a
+   sliver on a 375px screen, and the button is full-width there for the same reason. */
+.bgrow{display:flex;flex-direction:column;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--tx2);
+  background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:12px;line-height:1.5}
+.bgrow .btn{flex:0 0 auto;align-self:stretch;text-align:center}
+@media(min-width:560px){.bgrow{flex-direction:row;align-items:center;justify-content:space-between;gap:14px}
+  .bgrow .btn{align-self:auto}}
 .doorhelp{font-size:13px;color:var(--tx2);background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:12px;line-height:1.6}
 .doorhelp b{color:var(--tx)}
 .doorhelp p{margin:0 0 8px}
@@ -302,14 +315,18 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
   <div id="packwarn"></div>
   <div id="onboard"></div>
   <div class="controls">
-    <!-- Five primary tabs is the whole tool. Search, Progress and Sources are things
-         you go looking for, not things you do, so they sit behind the ··· rather than
-         making the first screen an eight-way decision. -->
+    <!-- Three primary tabs is the whole tool: read it, practise it, sit it.
+         Learn, Drill and Written used to be three of these, and the line between
+         them was HOW a card gets marked — self-graded, machine-graded, or graded
+         off marking points. That is an implementation detail wearing a navigation
+         label, and it cost the reader twice: no screen could state one honest card
+         count (Drill could only ever say "300" of a 586-card pack), and every
+         written question appeared in two tabs at once, because Learn holds saq too.
+         Search, Progress and Sources are things you go looking for, not things you
+         do, so they stay behind the ···. -->
     <div class="seg" id="nav">
       <button data-v="brief" id="navBrief" hidden>Brief</button>
-      <button data-v="learn" class="on">Learn</button>
-      <button data-v="mcq">Drill</button>
-      <button data-v="saq">Written</button>
+      <button data-v="study" class="on">Study</button>
       <button data-v="exam">Mock test</button>
       <button id="navMore" title="More" aria-expanded="false" aria-controls="nav2">···</button>
     </div>
@@ -558,6 +575,11 @@ function validateCoverage(p){
     const cs=(p.cards||[]).filter(c=>c.crit===cr.id||(c.alsoCrit||[]).includes(cr.id));
     const floor=cr.blind?Math.max(cfg.min,cfg.blindMin):cfg.min;
     if(cs.length<floor) errs.push(`focus point "${cr.name||cr.id}" has ${cs.length} cards, needs ${floor}`);
+    /* A focus point whose cards are ALL `bg` passes the floor above and is still
+       unreachable from the default queue: the Brief offers "▸ Drill this" and Study
+       answers "no cards in this topic". The floor counts the pack; this counts what
+       the reader is dealt. */
+    if(cs.length&&cs.every(c=>c.bg)) errs.push(`focus point "${cr.name||cr.id}" has ${cs.length} cards but every one is background reading — nothing to drill in the default queue`);
     if(cr.blind&&cfg.blindNeedsSaq&&!cs.some(c=>c.type==='saq')) errs.push(`focus point "${cr.name||cr.id}" is never practised anywhere in the course and has no written-answer card`);
   });
   return errs;
@@ -588,7 +610,7 @@ let S=load();
 if(window.Cloud) Cloud.sync([KEY]);   // syncs this pack's progress across devices when signed in; no-op otherwise
 function load(){
   try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.srs) return migrate(s); }catch(e){}
-  return {v:3,theme:'dark',topic:'all',door:'ready',srs:{},mcq:{},exams:[],read:{},saq:{}};
+  return {v:3,theme:'dark',topic:'all',door:'ready',bg:false,srs:{},mcq:{},exams:[],read:{},saq:{}};
 }
 /* v1 keyed progress by card index · v2 by a hash of the question · v3 adds the
    card's content signature so cards sharing a question stem stop sharing a record. */
@@ -617,7 +639,29 @@ function migrate(s){
 function save(){ localStorage.setItem(KEY,JSON.stringify(S)); }
 if(!S.door) S.door='ready';        // saves made before the two doors existed
 const topicName=id=>{const t=PACK.topics.find(t=>t.id===id);return t?`${t.icon} ${t.name}`:id;};
-/* type may be a single type or an array of them (AUTO / RECALL) */
+
+/* ---- background reading -------------------------------------------------------
+   A pack may mark a card `bg:true`: real content, worth having, but not what the
+   course has actually asked about. On hs2-test1 that is 346 of 586 cards — standard
+   physiology sitting on focus points the lecturer's own questions already cover.
+
+   Left in the default queue they are most of the tool, and "586 cards before the
+   23rd" is the kind of number that stops someone starting. So they are OUT of the
+   queue by default and one tap puts them back. What that must never become is a
+   hidden pack: they stay in the Brief, they stay in Search, the note above the queue
+   states both counts, and the toggle sits under BOTH doors. Nothing is deleted and
+   nothing is locked.
+
+   `hasBG()` is what makes it inert for every other pack. No `bg` on any card and the
+   toggle never renders and `inPool` is the identity. */
+let _hasBG=null;
+const hasBG=()=>_hasBG!==null?_hasBG:(_hasBG=PACK.cards.some(c=>c.bg));
+const bgOn=()=>!hasBG()||!!S.bg;
+const inPool=c=>!c.bg||bgOn();
+
+/* type may be a single type or an array of them (AUTO / RECALL).
+   `all` here means every card of that type; callers that must respect the background
+   setting filter with `inPool`. Search and the Brief deliberately do not. */
 const cardsOf=(type,topic)=>{ const ts=Array.isArray(type)?type:[type];
   return PACK.cards.map((c,i)=>({...c,key:ckey(c),idx:i})).filter(c=>ts.includes(c.type)&&(topic==='all'||c.topic===topic)); };
 
@@ -805,6 +849,67 @@ function feedbackHTML(c,resp,head){
   return `<div class="why">${head||''}${facts}${why}${briefLink(c)}</div>`;
 }
 
+/* ---- long cloze passages ------------------------------------------------------
+   The biggest cloze card in hs2-test1 is 404 words with ten dropdowns buried in it,
+   and it is not really a passage: it is ten separate numbered questions that Canvas
+   serialised into one multiple-dropdown item. Met as a single grey wall it is the
+   most demoralising card in the pack.
+
+   It cannot be SPLIT into several cards. Harvested cards are the lecturer's content
+   reproduced unaltered — verify-harvest.mjs proves it by diffing against the capture —
+   and cutting one in two would edit it, break that proof, and change the card's key.
+   So the card is untouched and the RENDERING is segmented: same text, same blanks,
+   same marking, same progress record, laid out as a list of short blocks.
+
+   Cuts are taken on the RAW text at sentence ends, and each piece KEEPS its trailing
+   separator, so `segments.join('') === text` exactly. That is the property worth
+   holding on to: segmentation can never drop, duplicate or reorder a word, and can
+   never leave a `[[n]]` token orphaned between two blocks. */
+const CLOZE_SEG_MIN=4;      // fewer blanks than this and it reads fine as prose
+const CLOZE_PER_SEG=2;      // blanks per block
+const NBLANK=/\[\[\d+\]\]/g;
+/* Sentence ends, dash bullets, and newlines. The dash alternatives require whitespace
+   BEFORE the dash, which is what stops them cutting inside "Cardio-acceleratory". */
+const CLOZE_NATURAL=/[.?!:]\s+|\s+[–—]\s*|\s+-(?=\s|[A-Z])|\n+/g;
+/* Last resort: cut immediately after a blank. Bounds every block no matter what the
+   prose looks like. */
+const CLOZE_AFTERBLANK=/\[\[\d+\]\]\s*/g;
+/* Split keeping each separator ON the piece before it, so join('') is the input. */
+function cutKeep(text,re){
+  const parts=[]; let last=0,m;
+  re.lastIndex=0;
+  while((m=re.exec(text))){
+    if(m[0].length===0){ re.lastIndex++; continue; }        // never loop on a zero-width match
+    parts.push(text.slice(last,m.index+m[0].length));
+    last=m.index+m[0].length;
+  }
+  if(last<text.length) parts.push(text.slice(last));
+  return parts.length?parts:[text];
+}
+function packParts(parts,max){
+  const segs=[]; let cur='',n=0;
+  for(const p of parts){
+    const b=(p.match(NBLANK)||[]).length;
+    if(cur&&n+b>max){ segs.push(cur); cur=p; n=b; }
+    else { cur+=p; n+=b; }
+  }
+  if(cur) segs.push(cur);
+  return segs;
+}
+function clozeSegments(text,nBlanks){
+  if(nBlanks<CLOZE_SEG_MIN) return [text];
+  const out=[];
+  for(const s of packParts(cutKeep(text,CLOZE_NATURAL),CLOZE_PER_SEG)){
+    /* A block still over the limit had no natural break in it at all — the harvested
+       slide dumps are like this, running on for 128 words with no full stop. Re-cut
+       those on blank boundaries so no block is ever a wall. */
+    if((s.match(NBLANK)||[]).length<=CLOZE_PER_SEG){ out.push(s); continue; }
+    out.push(...packParts(cutKeep(s,CLOZE_AFTERBLANK),CLOZE_PER_SEG));
+  }
+  return out.length?out:[text];
+}
+const clozeProg=(c,resp)=>`<b>${(resp||[]).filter(x=>x!=null).length}</b> of <b>${c.blanks.length}</b> filled`;
+
 function runnerHTML(r){
   const c=r.c, rev=r.rev, resp=r.resp;
   if(c.type==='mcq') return `<div class="opts">${r.ord.map((oi,k)=>{
@@ -825,18 +930,26 @@ function runnerHTML(r){
   }
 
   if(c.type==='cloze'){
-    let html=c.text;
-    c.blanks.forEach((b,i)=>{
-      const sel=resp[i]; let cls='blanksel';
+    const mk=i=>{
+      const b=c.blanks[i], sel=resp[i]; let cls='blanksel';
       if(rev) cls+=(sel===b.correct?' right':' wrong');
       const opts=r.ordB[i].map(oi=>`<option value="${oi}"${sel===oi?' selected':''}>${strip(b.options[oi])}</option>`).join('');
-      html=html.split('[['+(i+1)+']]').join(
-        `<select class="${cls}" data-b="${i}"${rev?' disabled':''}><option value=""${sel==null?' selected':''}>— select —</option>${opts}</select>`);
-    });
+      return `<select class="${cls}" data-b="${i}"${rev?' disabled':''}><option value=""${sel==null?' selected':''}>— select —</option>${opts}</select>`;
+    };
+    const segs=clozeSegments(c.text,c.blanks.length);
+    /* Substitution runs per segment. Every `[[n]]` sits in exactly one segment, so the
+       other passes are no-ops — and no boundary can ever fall inside generated markup,
+       because the segments were cut from the RAW text before any <select> existed. */
+    const body=segs.map(s=>{
+      let h=s;
+      c.blanks.forEach((_,i)=>{ const tok='[['+(i+1)+']]'; if(h.indexOf(tok)>=0) h=h.split(tok).join(mk(i)); });
+      return segs.length>1?`<div class="clozeseg">${h}</div>`:h;
+    }).join('');
     /* The correct answers used to be restated here as well as in the feedback block,
        so a wrong cloze printed the same list twice. There is one explanation block
        now and `synthWhy` owns it — see the explanation floor. */
-    return `<div class="clozebody">${html}</div>`;
+    return `<div class="clozebody${segs.length>1?' seg':''}">${body}</div>`
+      +(c.blanks.length>=CLOZE_SEG_MIN&&!rev?`<div class="clozeprog" id="clozeprog">${clozeProg(c,resp)}</div>`:'');
   }
 
   if(c.type==='tfset') return c.statements.map((s,i)=>{
@@ -871,8 +984,13 @@ function wireRunner(root,r,onChange){
       r.resp[i]=null; onChange();                    // tap a filled slot to send it back
     });
   }
+  /* The counter is updated HERE rather than in the view's refresh, so it works in the
+     mock test too — and in place rather than by re-render, which would drop the
+     reader's scroll position halfway down a ten-blank passage. */
   if(c.type==='cloze') root.querySelectorAll('select[data-b]').forEach(s=>s.onchange=()=>{
-    r.resp[+s.dataset.b]= s.value===''?null:+s.value; onChange(); });
+    r.resp[+s.dataset.b]= s.value===''?null:+s.value;
+    const cp=root.querySelector('#clozeprog'); if(cp) cp.innerHTML=clozeProg(c,r.resp);
+    onChange(); });
   if(c.type==='tfset') root.querySelectorAll('.tfbtns button').forEach(b=>b.onclick=()=>{
     r.resp[+b.dataset.t]= b.dataset.v==='1';
     root.querySelectorAll('.tfbtns button').forEach(x=>x.classList.toggle('on', r.resp[+x.dataset.t]===(x.dataset.v==='1')));
@@ -1027,11 +1145,11 @@ function renderAudit(){
 }
 
 /* ---- nav ----
-   Five tabs are the tool: read it, learn it, drill it, write it, sit it. Search,
-   Progress and Sources are things you go and look for rather than things you do, so
-   they live behind the ··· — an eight-way choice on first contact is a tax paid by
-   every user for three views most of them will open twice. */
-let VIEW='learn', CUR=null, EX=null;
+   Three tabs are the tool: read it, practise it, sit it. Search, Progress and Sources
+   are things you go and look for rather than things you do, so they live behind the
+   ··· — a six-way choice on first contact is a tax paid by every user for three views
+   most of them will open twice. */
+let VIEW='study', CUR=null, EX=null;
 const view=$('#view');
 const SECOND=['search','stats','audit'];
 const navBtns=()=>$$('#nav button[data-v], #nav2 button[data-v]');
@@ -1040,11 +1158,17 @@ function showMore(on){
   $('#navMore').classList.toggle('on',on);
   $('#navMore').setAttribute('aria-expanded',String(on));
 }
+const VIEWS={brief:renderBrief,study:renderStudy,exam:renderExamSetup,search:renderSearch,stats:renderStats,audit:renderAudit};
+/* learn / mcq / saq were three tabs before the queues merged. The hub deep-links by
+   mode and a reader may have bookmarked one, so they alias onto Study rather than
+   landing on a blank view. */
+const VIEWALIAS={learn:'study',mcq:'study',saq:'study'};
 function nav(v){
+  v=VIEWALIAS[v]||v;
   VIEW=v;
   navBtns().forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   if(SECOND.includes(v)) showMore(true);      // never leave the active tab hidden
-  ({brief:renderBrief,learn:renderLearn,mcq:renderDrill,saq:renderSaq,exam:renderExamSetup,search:renderSearch,stats:renderStats,audit:renderAudit})[v]();
+  VIEWS[v]();
 }
 navBtns().forEach(b=>b.onclick=()=>nav(b.dataset.v));
 $('#navMore').onclick=()=>showMore($('#nav2').classList.contains('hidden'));
@@ -1114,7 +1238,25 @@ function cardRank(c,cm){
      - A card you get wrong is spliced back in a few cards ahead, which is what
        makes it a cram tool rather than a reading order.
    The deck rebuilds and re-ranks when it runs out, or when the door, topic or
-   focus scope changes.                                                       */
+   focus scope changes.
+
+   BODY-SYSTEM BLOCKS. Even stride across every topic was right about topic
+   starvation and wrong about everything else: on hs2-test1 it dealt a perfect
+   round-robin through all twelve topics, so fourteen consecutive cards ran gas
+   exchange → terminology → vessels → control of breathing → blood pressure →
+   heart anatomy → respiratory anatomy → immunity → … You never stay inside one
+   system long enough to build anything, and a cram tool that hops systems every
+   card is asking for twelve cold starts instead of one warm run.
+
+   So a pack may declare `systems` — an ordered list — and give each topic a `sys`.
+   The deck is then dealt one system at a time in that order, and stride-merging
+   happens only among the topics INSIDE a system, where interleaving is right:
+   heart anatomy and the cardiac cycle genuinely explain each other. Rank still
+   orders cards within a topic, so the lecturer's own questions still lead — they
+   now lead within their system rather than globally, which is what the door note
+   has to say, and does.
+
+   A pack that declares no systems keeps the old whole-pack stride exactly.      */
 /* Even stride: a topic holding n of N cards is dealt every N/n slots, so every
    topic is spread across the whole deck whatever its size, and the largest topic
    cannot bunch at the tail the way plain round-robin leaves it. */
@@ -1127,14 +1269,27 @@ function deckSource(types){
   /* "Get me ready" ranks the whole pack; "I'll pick" honours the topic chip. A
      focus scope from the Brief overrides both, and falls back to the whole pack
      for that focus point if the current filter holds none of it. */
-  const base=S.door==='ready'?cardsOf(types,'all'):cardsOf(types,S.topic);
-  const scoped=!S.crit?base:(critScope(base).length?critScope(base):critScope(cardsOf(types,'all')));
+  const all=cardsOf(types,'all').filter(inPool);
+  const base=S.door==='ready'?all:cardsOf(types,S.topic).filter(inPool);
+  const scoped=!S.crit?base:(critScope(base).length?critScope(base):critScope(all));
   /* Two cards with the same key are the same card — same type, same question, same
      answer. hs2-test1 carries five such pairs from a double-import in the harvest.
      They share one progress record by definition, so dealing both just serves the
      reader the identical question twice in a pass. */
   const seen=new Set();
   return scoped.filter(c=>seen.has(c.key)?false:(seen.add(c.key),true));
+}
+/* The declared system order, as topic-id lists — plus a final block holding every
+   topic no system claims, so a pack with a partial `systems` list still deals every
+   card it has. Returns null when the pack declares no systems at all. */
+function systemBlocks(){
+  const sys=PACK.systems||[];
+  if(!sys.length) return null;
+  const ids=new Set(sys.map(s=>s.id));
+  const blocks=sys.map(s=>({id:s.id,name:s.name||s.id,topics:PACK.topics.filter(t=>t.sys===s.id).map(t=>t.id)}));
+  const orphan=PACK.topics.filter(t=>!ids.has(t.sys)).map(t=>t.id);
+  if(orphan.length) blocks.push({id:'_rest',name:'Everything else',topics:orphan});
+  return blocks;
 }
 function buildDeck(types){
   const cm={}; (PACK.criteria||[]).forEach(c=>cm[c.id]=c);
@@ -1147,17 +1302,28 @@ function buildDeck(types){
      rank decides WHAT you see from a topic, never WHETHER you reach it. */
   const by={};
   src.forEach(c=>(by[c.topic]=by[c.topic]||[]).push(c));
-  const groups=Object.values(by).map(q=>{
+  const ranked=q=>{
     const bands=[[],[],[],[]];
     q.forEach(c=>bands[cardRank(c,cm)].push(c));
     return [].concat(...bands.map(shuffle));
-  });
-  return strideMerge(groups,src.length);
+  };
+  const blocks=systemBlocks();
+  if(!blocks) return strideMerge(Object.values(by).map(ranked),src.length);
+  /* One system at a time, stride-merging only the topics inside it. Every group in
+     `by` belongs to exactly one block — systemBlocks sweeps unclaimed topics into a
+     final block — so this deals each card exactly once. */
+  const out=[];
+  for(const b of blocks){
+    const groups=b.topics.map(t=>by[t]).filter(g=>g&&g.length);
+    if(!groups.length) continue;
+    out.push(...strideMerge(groups.map(ranked),groups.reduce((n,g)=>n+g.length,0)));
+  }
+  return out;
 }
 /* In memory only — a deck is a sitting, not saved progress. */
 const DECK={};
 const deckKey=t=>Array.isArray(t)?t.join('+'):t;
-const deckSig=()=>[S.door,S.topic,S.crit].join('|');
+const deckSig=()=>[S.door,S.topic,S.crit,bgOn()].join('|');   // toggling background rebuilds the deck
 function nextCard(types){
   const k=deckKey(types), sig=deckSig();
   let d=DECK[k];
@@ -1171,16 +1337,36 @@ function requeue(types,card,gap){
   if(!d||!card) return;
   d.cards.splice(Math.min(d.i+gap,d.cards.length),0,card);
 }
-/* Composition of the current deck, for the door note. Reports, never filters. */
+/* Composition of the current deck, for the door note. Reports, never filters.
+
+   `weak` counts only cards the reader has ACTUALLY ATTEMPTED and is scoring badly
+   on. cardWeak() deliberately treats never-attempted as weak — that is right for
+   ORDERING, since an untouched card is exactly as unproven as a failed one — but it
+   is wrong for a sentence. Reported raw it told a reader who had answered nothing
+   that 356 cards were ones "you have been getting wrong", which is both false and
+   the single most discouraging thing the tool could open with. */
+function cardSeen(c){
+  if(isRecall(c)) return srsGet(c.key).seen>0;
+  const m=S.mcq[c.key];
+  return !!(m&&m.t);
+}
 function deckStats(types){
   const cm={}; (PACK.criteria||[]).forEach(c=>cm[c.id]=c);
   const src=deckSource(types);
+  /* Which system blocks this deck ACTUALLY contains. The note names them, and
+     `systemBlocks()` is derived from the pack, not the pool — so with background
+     reading switched off it would happily announce an order containing a block that
+     has no cards left in it. Name what will be dealt. */
+  const tops=new Set(src.map(c=>c.topic));
+  const blocks=(systemBlocks()||[]).filter(b=>b.id!=='_rest'&&b.topics.some(t=>tops.has(t)));
   return {total:src.length, hot:src.filter(c=>cardRank(c,cm)===0).length,
-          weak:src.filter(c=>cardRank(c,cm)===1).length};
+          weak:src.filter(c=>cardRank(c,cm)===1&&cardSeen(c)).length, blocks};
 }
 /* per-topic readiness, or null when there is genuinely no data to report */
 function topicReady(tid){
-  const cs=PACK.cards.map(c=>({...c,key:ckey(c)})).filter(c=>c.topic===tid);
+  /* Against the pool actually being studied. Counting demoted background cards here
+     would report a topic as barely started because of cards the queue never deals. */
+  const cs=PACK.cards.map(c=>({...c,key:ckey(c)})).filter(c=>c.topic===tid&&inPool(c));
   const rec=cs.filter(isRecall), acc=autoAcc(cs);
   const seen=rec.filter(c=>srsGet(c.key).seen>0).length;
   if(!seen&&!acc) return null;
@@ -1198,6 +1384,57 @@ function chipRow(cb){
   setTimeout(()=>$$('.chip').forEach(c=>c.onclick=()=>{S.topic=c.dataset.t;save();cb();}),0);
   return html;
 }
+/* The door note has to describe the deck the reader is actually about to be dealt.
+   When the pack blocks by body system, "the most useful lead" is no longer true of
+   the whole deck — they lead INSIDE each system — and a note that keeps saying it
+   globally is telling a small lie about the one thing the reader is trusting. */
+function deckNote(P){
+  /* Built as a list, not a chain of ternaries, because either half can be zero: a
+     cold reader has no wrong answers and a reader who has mastered every past-quiz
+     card has no hot ones. Joining with "then" only when both are present keeps
+     "the most useful come first: then the 12 you have been getting wrong" — which
+     the ternary version produced — off the screen. */
+  const parts=[];
+  if(P.hot)  parts.push(`the <b>${P.hot}</b> that have either been asked on a past quiz or cover parts of the course no practice test touches`);
+  if(P.weak) parts.push(`the <b>${P.weak}</b> you have been getting wrong`);
+  const useful=parts.join(', then ');
+  /* "Nothing is held back" is true of the DECK and, when a background pool is sitting
+     out, false of the pack. Printed unqualified it contradicted the row directly
+     beneath it, which exists to say that 346 cards are held back. So the claim narrows
+     to the set it is actually about and `bgRow` keeps ownership of the rest. */
+  const held=hasBG()&&!S.bg;
+  const all=held?' in that set':'';
+  const named=(P.blocks||[]).map(x=>`<b>${esc(x.name)}</b>`);
+  if(named.length>1){
+    return `<div class="doornote">All <b>${P.total}</b> cards are in the rotation, worked through in course order — ${
+      named.join(', then ')}.${useful?` Inside each block the most useful come first: ${useful}.`:''} Nothing${all} is held back.</div>`;
+  }
+  return `<div class="doornote">All <b>${P.total}</b> cards are in the rotation — the order just puts the most useful first.${
+    useful?` It leads with ${useful}.`:''} Nothing${all} is held back.</div>`;
+}
+/* The background-reading switch. Renders under BOTH doors, states both counts either
+   way, and never hides what it is doing — the whole point is that a reader can see
+   there is more and reach it in one tap. */
+function bgRow(types){
+  if(!hasBG()) return '';
+  const all=cardsOf(types,'all');
+  const bg=all.filter(c=>c.bg).length, core=all.length-bg;
+  if(!bg) return '';
+  return S.bg
+    ? `<div class="bgrow"><span>Showing all <b>${all.length}</b> cards, including the <b>${bg}</b> filed as background reading.</span>
+         <button class="btn ghost" id="bgTog">− Just the ${core} the course has asked about</button></div>`
+    : `<div class="bgrow"><span>Showing the <b>${core}</b> cards the course has set questions on, or that cover ground no practice test touches. The other <b>${bg}</b> are <b>background reading</b> — standard physiology written to make those make sense. They are still in the Brief and in Search.</span>
+         <button class="btn ghost" id="bgTog">+ Add the ${bg} background cards</button></div>`;
+}
+/* Delegated, not wired per render, for the same reason #scopeClr is: every other
+   post-render binding in this file attaches on a setTimeout and is documented as racy,
+   and a lost binding HERE leaves the reader inside the reduced pool with no way to
+   reach the other cards — which is a lock, and the two-doors rule forbids one.
+   Delegation cannot come unbound. */
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#bgTog')) return;
+  S.bg=!S.bg; save(); nav(VIEW);
+});
 /* `readyNote` lets a view describe its own "Get me ready" behaviour. The Brief
    orders the focus points rather than drawing a card queue, so the card-count note
    would be meaningless there. */
@@ -1209,10 +1446,7 @@ function gate(cb,types,readyNote){
       <button class="iconbtn" id="doorWhy" title="What the difference is">?</button>
     </div>
     <div id="doorHelp"></div>
-    ${S.door!=='ready'?'':readyNote!==undefined?readyNote
-      :P?`<div class="doornote">All <b>${P.total}</b> cards are in the rotation — the order just puts the most useful first.${
-          P.hot?` <b>${P.hot}</b> of them have either been asked on a past quiz or cover parts of the course no practice test touches, so they lead.`:''}${
-          P.weak?` Then the <b>${P.weak}</b> you have been getting wrong.`:''} Nothing is held back.</div>`:''}`;
+    ${S.door!=='ready'?'':readyNote!==undefined?readyNote:P?deckNote(P):''}`;
   setTimeout(()=>{
     // Pre-existing race: this fires a tick after render, and switching tabs quickly
     // replaces the view before it runs, so the elements are gone. Guard rather than throw.
@@ -1223,8 +1457,12 @@ function gate(cb,types,readyNote){
       h.innerHTML = h.innerHTML ? '' : `<div class="doorhelp">
         <p><b>Both doors hold exactly the same cards.</b> The only difference is who
         decides what you see next.</p>
-        <p><b>🎯 Get me ready</b> decides for you. You still get through every card —
-        it just leads with the ones that have come up on a past quiz, and the parts of
+        ${hasBG()?`<p>Both are also showing the same set — the <b>background reading</b>
+        switch below sits outside this choice and applies to either door.</p>`:''}
+        <p><b>🎯 Get me ready</b> decides for you. You still get through every card${
+          systemBlocks()?`, working through the course in its own order — one system
+        finished before the next one starts. Inside each block it leads`:` —
+        it just leads`} with the ones that have come up on a past quiz, and the parts of
         the course no practice test covers. Then the ones you keep getting wrong.</p>
         <p><b>🗂 I'll pick</b> hands you the topics and gets out of the way.</p>
         <p>Either way you will not meet the same card twice until you have been through
@@ -1234,7 +1472,10 @@ function gate(cb,types,readyNote){
         ${PACK.sources?`<p style="border-top:1px solid var(--line);padding-top:9px;margin-top:9px"><b>Where this content comes from.</b> ${PACK.sources}</p>`:''}</div>`;
     };
   },0);   // chip wiring is chipRow's own job
-  return html+(S.door==='pick'?chipRow(cb):'');
+  /* Only on a card-queue view. The Brief passes a `readyNote` and shows every focus
+     point and every fact under both doors by design — offering to "add" there would
+     imply something was missing from it, which is the opposite of true. */
+  return html+(S.door==='pick'?chipRow(cb):'')+(readyNote===undefined?bgRow(types):'');
 }
 
 /* ============================== Brief ==============================
@@ -1287,8 +1528,13 @@ function critProse(id){
    nobody has touched is indistinguishable from one attempted and failed — the Brief's
    "not drilled yet" never appeared, and the readiness readout called untouched
    material "your weakest so far". */
+/* Measured over the cards the reader is actually DEALT, not every card filed under the
+   focus point. Nine of hs2-test1's focus points are more than 70% background reading —
+   resp-10 is 13 of 14 — so counting the demoted cards would peg them near zero forever
+   and park them permanently at the top of "where the next half hour goes", pointing the
+   reader at work the queue was never going to give them. */
 function critMastery(id){
-  const cs=critCards(id); if(!cs.length) return null;
+  const cs=critCards(id).filter(inPool); if(!cs.length) return null;
   const rec=cs.filter(isRecall), a=autoAcc(cs), parts=[];
   if(rec.some(c=>srsGet(c.key).seen>0)) parts.push(rec.filter(c=>srsGet(c.key).box>=2).length/rec.length);
   if(a) parts.push(a.pct/100);
@@ -1369,7 +1615,7 @@ function renderBrief(){
     if(pr) pr.textContent=`${n} of ${all.length} read`;
     if(pb) pb.style.width=(all.length?n/all.length*100:0)+'%';
   });
-  $$('[data-drill]').forEach(b=>b.onclick=()=>{ S.crit=b.dataset.drill; save(); nav('learn'); window.scrollTo({top:0}); });
+  $$('[data-drill]').forEach(b=>b.onclick=()=>{ S.crit=b.dataset.drill; save(); nav('study'); window.scrollTo({top:0}); });
 }
 
 /* ---- criterion scope, set by the Brief's ▸ Drill this ----
@@ -1408,114 +1654,132 @@ document.addEventListener('click',e=>{
 });
 const critScope=cs=>S.crit?cs.filter(c=>c.crit===S.crit||(c.alsoCrit||[]).includes(S.crit)):cs;
 
-/* ---- Learn (flash + saq as flip cards with SRS) ---- */
-function renderLearn(){
-  const G=gate(renderLearn,RECALL)+scopeBanner();
-  CUR=nextCard(RECALL);
+/* ============================== Study ==============================
+   ONE queue holding every card the pack has, dealt from one deck.
+
+   This replaces Learn, Drill and Written. Those three split the pack by how a card
+   is MARKED — you grade yourself, the machine grades you, or you grade against
+   marking points — which is a fact about the code, not about studying. What the
+   reader got for it:
+
+     · no screen could state an honest card count. Drill holds only the
+       machine-marked types, so on hs2-test1 it announced "all 300 cards" of a
+       586-card pack while the Sources view said 586. Both were true. Neither
+       was reconcilable from the screen.
+     · every written question was in TWO tabs, because Learn's card set is
+       flash + saq and Written's is saq. 44 cards, listed twice, silently.
+     · three separate decks meant three separate passes through three separate
+       slices, and no single place that could say "you have been through it".
+
+   One deck fixes all three. A card still renders in its own form — a flashcard
+   flips, a written answer reveals its marking points, a machine-marked card gets
+   answered and marked — but that is now an INTERACTION the card chooses, not a
+   destination the reader has to choose first.                                  */
+function renderStudy(){
+  const G=gate(renderStudy,ALLTYPES)+scopeBanner();
+  CUR=nextCard(ALLTYPES);
   if(!CUR){ view.innerHTML=G+`<div class="empty">No cards in this topic yet.</div>`; return; }
-  view.innerHTML=G+`
-    <div class="card">
-      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span>${provHTML(CUR)}<span class="tag right">learn</span></div>
-      <div class="q">${CUR.q}</div><div class="provslot"></div>
-      ${figHTML(CUR)}
-      ${CUR.type==='saq'?`<div class="marks">${cardMarks(CUR)} marks — say your answer out loud, then flip.</div>`:''}
-      <div id="ansZone"><div class="btnrow"><button class="btn primary" id="flip">Show answer ↵</button></div></div>
-    </div>`;
-  $('#flip').onclick=flipLearn;
-  document.onkeydown=e=>{ if(VIEW==='learn'&&e.key==='Enter'&&$('#flip')) flipLearn(); };
+  const c=CUR, tot=cardMarks(c);
+  /* A flashcard's "1 mark" is an artefact of cardMarks defaulting, not something the
+     paper awards. Showing it would put a number on the one card type that has none. */
+  const head=`
+      <div class="cmeta"><span class="tag acc">${topicName(c.topic)}</span>${
+        c.type==='flash'?'':`<span class="tag">${tot} mark${tot>1?'s':''}</span>`}${
+        provHTML(c)}<span class="tag right">${TYPELABEL[c.type]}</span></div>
+      <div class="q">${c.q}</div><div class="provslot"></div>
+      ${figHTML(c)}`;
+  if(c.type==='flash')    studyFlash(G,head,c);
+  else if(c.type==='saq') studyWritten(G,head,c);
+  else                    studyAuto(G,head,c,tot);
 }
-function flipLearn(){
-  const c=CUR;
-  const body = c.type==='flash'
-    ? `<div class="answer"><div class="lab">Answer</div><div class="txt">${c.a}</div>${srcHTML(c)}</div>`
-    : `<div class="answer"><div class="lab">Marking points</div><ul class="points">${c.points.map((p,i)=>`<li><span class="n">${i+1}</span><span>${p}</span></li>`).join('')}</ul>${c.model?`<div class="why">💡 ${c.model}</div>`:''}</div>`;
-  $('#ansZone').innerHTML=body+`
-    <div class="rate">
+
+/* Self-graded recall, shared by flashcards and (after scoring) written answers. */
+const RATEROW=`<div class="rate">
       <button class="r1" data-r="0">✗ Again</button>
       <button class="r2" data-r="1">Hard</button>
       <button class="r3" data-r="2">Good</button>
       <button class="r4" data-r="3">Easy</button>
     </div>`;
+function wireRate(c){
   $$('.rate button').forEach(b=>b.onclick=()=>{
     const r=+b.dataset.r;
     srsRate(c.key,r);
-    if(r<=1) requeue(RECALL,c,r===0?4:10);   // Again comes back sooner than Hard
-    renderLearn();
+    if(r<=1) requeue(ALLTYPES,c,r===0?4:10);   // Again comes back sooner than Hard
+    renderStudy();
   });
 }
 
-/* ---- Drill: every auto-marked type (mcq / order / cloze / tfset / match) ---- */
-function renderDrill(){
-  const G=gate(renderDrill,AUTO)+scopeBanner();
-  CUR=nextCard(AUTO);
-  if(!CUR){ view.innerHTML=G+`<div class="empty">No questions in this topic yet.</div>`; return; }
-  const r=makeRunner(CUR), tot=cardMarks(CUR);
-  view.innerHTML=G+`
-    <div class="card">
-      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">${tot} mark${tot>1?'s':''}</span>${provHTML(CUR)}<span class="tag right">${TYPELABEL[CUR.type]}</span></div>
-      <div class="q">${CUR.q}</div><div class="provslot"></div>
-      ${figHTML(CUR)}
-      <div id="body">${runnerHTML(r)}</div>
-      <div id="fb">${CUR.type==='mcq'?'':`<div class="btnrow"><button class="btn primary" id="submit" disabled>Check answer ↵</button></div>`}</div>
+/* ---- flashcard: recall it, flip it, grade yourself ---- */
+function studyFlash(G,head,c){
+  view.innerHTML=G+`<div class="card">${head}
+      <div id="ansZone"><div class="btnrow"><button class="btn primary" id="flip">Show answer ↵</button></div></div>
     </div>`;
-  const refresh=()=>{
-    if(CUR.type==='order'){ $('#body').innerHTML=runnerHTML(r); wireRunner($('#body'),r,refresh); }
-    const sb=$('#submit'); if(sb) sb.disabled=!runnerDone(r);
-    if(CUR.type==='mcq'&&runnerDone(r)) grade();
+  const flip=()=>{
+    $('#ansZone').innerHTML=`<div class="answer"><div class="lab">Answer</div><div class="txt">${c.a}</div>${srcHTML(c)}</div>`+RATEROW;
+    wireRate(c);
   };
-  const grade=()=>{
-    r.rev=true;
-    const {got}=markAuto(CUR,r.resp), ok=got===tot;
-    $('#body').innerHTML=runnerHTML(r);
-    const m=S.mcq[CUR.key]||{a:0,c:0}; m.a++; if(ok)m.c++;
-    m.g=(m.g||0)+got; m.t=(m.t||0)+tot; S.mcq[CUR.key]=m; save();
-    if(!ok) requeue(AUTO,CUR,got?10:4);      // partly right waits longer than fully wrong
-    $('#fb').innerHTML=feedbackHTML(CUR,r.resp,`${ok?'✅':got?'➖':'❌'} <b>${got} / ${tot} mark${tot>1?'s':''}.</b> `)+srcHTML(CUR)+
-      `<div class="btnrow"><button class="btn primary" id="next">Next ↵</button></div>`;
-    $('#next').onclick=renderDrill;
-    document.onkeydown=e=>{ if(VIEW==='mcq'&&e.key==='Enter'&&$('#next')) renderDrill(); };
-  };
-  wireRunner($('#body'),r,refresh);
-  if($('#submit')) $('#submit').onclick=grade;
-  document.onkeydown=e=>{ if(VIEW==='mcq'&&e.key==='Enter'&&$('#submit')&&!$('#submit').disabled) grade(); };
+  $('#flip').onclick=flip;
+  document.onkeydown=e=>{ if(VIEW==='study'&&e.key==='Enter'&&$('#flip')) flip(); };
 }
 
-/* ---- Written: the questions you answer in prose and mark yourself ---- */
-function renderSaq(){
-  const G=gate(renderSaq,'saq')+scopeBanner();
-  CUR=nextCard('saq');
-  if(!CUR){ view.innerHTML=G+`<div class="empty">No written questions in this topic yet.</div>`; return; }
-  view.innerHTML=G+`
-    <div class="card">
-      <div class="cmeta"><span class="tag acc">${topicName(CUR.topic)}</span><span class="tag">${cardMarks(CUR)} marks</span>${provHTML(CUR)}<span class="tag right">written answer</span></div>
-      <div class="q">${CUR.q}</div><div class="provslot"></div>
-      ${figHTML(CUR)}
+/* ---- written answer: say it, reveal the marking points, tick honestly ---- */
+function studyWritten(G,head,c){
+  view.innerHTML=G+`<div class="card">${head}
       <!-- The one place "SAQ" is glossed. A student does meet the abbreviation in the
            course, so hiding it entirely would be its own confusion — but they should
-           meet it here, once, next to the plain words, and not on first contact. -->
-      <div class="hinttxt">These are the written questions — the ones the course calls <b>SAQs</b>. Write or say your full answer first, then reveal the marking points and mark yourself honestly.</div>
+           meet it here, next to the plain words, rather than as a tab name. -->
+      <div class="hinttxt">A <b>written</b> question — what the course calls an <b>SAQ</b>. Say or write your full answer first, then reveal the marking points and mark yourself honestly.</div>
       <div id="ansZone"><div class="btnrow"><button class="btn primary" id="flip">Reveal marking points ↵</button></div></div>
     </div>`;
   const reveal=()=>{
     $('#ansZone').innerHTML=`
       <div class="answer"><div class="lab">Tick every point you got</div>
-      <ul class="points" id="pts">${CUR.points.map((p,i)=>`<li data-i="${i}"><span class="n">${i+1}</span><span>${p}</span></li>`).join('')}</ul>
-      ${CUR.model?`<div class="why">💡 ${CUR.model}</div>`:''}${srcHTML(CUR)}
+      <ul class="points" id="pts">${c.points.map((p,i)=>`<li data-i="${i}"><span class="n">${i+1}</span><span>${p}</span></li>`).join('')}</ul>
+      ${c.model?`<div class="why">💡 ${c.model}</div>`:''}${srcHTML(c)}
       <div class="btnrow"><button class="btn primary" id="done">Score it</button></div></div>`;
     $$('#pts li').forEach(li=>li.onclick=()=>li.classList.toggle('got'));
     $('#done').onclick=()=>{
-      const got=$$('#pts li.got').length, tot=CUR.points.length;
+      const got=$$('#pts li.got').length, tot=c.points.length;
       const pct=got/tot;
-      const sm=S.saq[CUR.key]||{g:0,t:0}; sm.g+=got; sm.t+=tot; S.saq[CUR.key]=sm;
-      srsRate(CUR.key, pct>=1?3 : pct>=0.8?2 : pct>=0.5?1 : 0);
-      if(pct<0.8) requeue('saq',CUR,pct>=0.5?10:4);
+      const sm=S.saq[c.key]||{g:0,t:0}; sm.g+=got; sm.t+=tot; S.saq[c.key]=sm;
+      srsRate(c.key, pct>=1?3 : pct>=0.8?2 : pct>=0.5?1 : 0);   // srsRate saves
+      if(pct<0.8) requeue(ALLTYPES,c,pct>=0.5?10:4);
       $('#done').outerHTML=`<div class="why" style="flex:1">Scored <b>${got}/${tot}</b> — ${pct>=0.8?'strong ✅':pct>=0.5?'getting there — this one comes back soon':'this one goes back to the front of the queue 🔁'}</div><button class="btn primary" id="next">Next ↵</button>`;
-      $('#next').onclick=renderSaq;
-      document.onkeydown=e=>{ if(VIEW==='saq'&&e.key==='Enter'&&$('#next')) renderSaq(); };
+      $('#next').onclick=renderStudy;
+      document.onkeydown=e=>{ if(VIEW==='study'&&e.key==='Enter'&&$('#next')) renderStudy(); };
     };
   };
   $('#flip').onclick=reveal;
-  document.onkeydown=e=>{ if(VIEW==='saq'&&e.key==='Enter'&&$('#flip')) reveal(); };
+  document.onkeydown=e=>{ if(VIEW==='study'&&e.key==='Enter'&&$('#flip')) reveal(); };
+}
+
+/* ---- machine-marked: mcq / order / cloze / tfset / match ---- */
+function studyAuto(G,head,c,tot){
+  const r=makeRunner(c);
+  view.innerHTML=G+`<div class="card">${head}
+      <div id="body">${runnerHTML(r)}</div>
+      <div id="fb">${c.type==='mcq'?'':`<div class="btnrow"><button class="btn primary" id="submit" disabled>Check answer ↵</button></div>`}</div>
+    </div>`;
+  const refresh=()=>{
+    if(c.type==='order'){ $('#body').innerHTML=runnerHTML(r); wireRunner($('#body'),r,refresh); }
+    const sb=$('#submit'); if(sb) sb.disabled=!runnerDone(r);
+    if(c.type==='mcq'&&runnerDone(r)) grade();
+  };
+  const grade=()=>{
+    r.rev=true;
+    const {got}=markAuto(c,r.resp), ok=got===tot;
+    $('#body').innerHTML=runnerHTML(r);
+    const m=S.mcq[c.key]||{a:0,c:0}; m.a++; if(ok)m.c++;
+    m.g=(m.g||0)+got; m.t=(m.t||0)+tot; S.mcq[c.key]=m; save();
+    if(!ok) requeue(ALLTYPES,c,got?10:4);      // partly right waits longer than fully wrong
+    $('#fb').innerHTML=feedbackHTML(c,r.resp,`${ok?'✅':got?'➖':'❌'} <b>${got} / ${tot} mark${tot>1?'s':''}.</b> `)+srcHTML(c)+
+      `<div class="btnrow"><button class="btn primary" id="next">Next ↵</button></div>`;
+    $('#next').onclick=renderStudy;
+    document.onkeydown=e=>{ if(VIEW==='study'&&e.key==='Enter'&&$('#next')) renderStudy(); };
+  };
+  wireRunner($('#body'),r,refresh);
+  if($('#submit')) $('#submit').onclick=grade;
+  document.onkeydown=e=>{ if(VIEW==='study'&&e.key==='Enter'&&$('#submit')&&!$('#submit').disabled) grade(); };
 }
 
 /* ---- Mock test ---- */
@@ -1532,8 +1796,12 @@ function drawPool(cards){                        // never-practised focus points
 function takeUnique(pool,n){ const seen=new Set(),out=[];
   for(const c of shuffle(pool)){ if(seen.has(c.key))continue; seen.add(c.key); out.push(c); if(out.length>=n)break; }
   return out; }
+/* The mock test sits the pool you are STUDYING, not the whole pack. Drawing questions
+   from cards the queue never deals would test a reader on material the tool had
+   decided not to show them — the one thing a practice paper must not do. Turn the
+   background reading on and the mock test widens with it. */
 function drawAuto(n,mix){
-  const elig=cardsOf(AUTO,'all').filter(examEligible);
+  const elig=cardsOf(AUTO,'all').filter(examEligible).filter(inPool);
   let out=[];
   if(mix) for(const t in mix){
     const sub=elig.filter(c=>c.type===t);
@@ -1551,7 +1819,8 @@ function drawAuto(n,mix){
 function renderExamSetup(){
   const cfg=Object.assign({auto:10,saq:2,minutes:0,pass:80},PACK.exam||{});
   if(PACK.exam&&PACK.exam.mcq!=null&&PACK.exam.auto==null) cfg.auto=PACK.exam.mcq;   // legacy packs
-  const autoAll=cardsOf(AUTO,'all').filter(examEligible), saqAll=cardsOf('saq','all').filter(examEligible);
+  const autoAll=cardsOf(AUTO,'all').filter(examEligible).filter(inPool),
+        saqAll=cardsOf('saq','all').filter(examEligible).filter(inPool);
   const nA=Math.min(cfg.auto,autoAll.length), nS=Math.min(cfg.saq,saqAll.length);
   const last=S.exams[0];
   view.innerHTML=`
@@ -1560,6 +1829,7 @@ function renderExamSetup(){
       <p>A full practice run under the real conditions: <b>${nA}</b> marked-for-you + <b>${nS}</b> written questions, every topic mixed${cfg.minutes?`, <b>${cfg.minutes} minutes</b> on the clock`:''}. Nothing is marked until the end. Marked ${passPhrase()}.</p>
       ${PASSTARGET()?`<p style="font-size:12.5px;color:var(--tx3);margin:-8px 0 14px">${passCaveat()}</p>`:''}
       ${cfg.noPaper?`<div class="packwarn">✋ <b>No rough paper.</b> That's the real condition — work the multi-step questions in your head, not on a pad.</div>`:''}
+      ${hasBG()&&!S.bg?`<p style="font-size:12.5px;color:var(--tx3);margin:-8px 0 14px">Drawn from the <b>${autoAll.length+saqAll.length}</b> questions you are studying, not the background reading — so it cannot ask you something the queue has never shown you. Add the background cards in <b>Study</b> and this widens with them.</p>`:''}
       ${nA+nS>0?`<button class="bigstart" id="start">START THE MOCK TEST</button>`:`<div class="empty">This pack has no questions to sit yet — a mock test needs at least one.</div>`}
       ${last?`<p style="margin:12px 0 0;text-align:center">Last attempt: <b>${last.score}%</b> ${last.pass?'✅':'❌'}</p>`:''}
       ${PACK.exam&&PACK.exam.date&&daysLeft()!=null&&daysLeft()>=0?`<p style="margin:8px 0 0;text-align:center;font-size:12.5px;color:var(--tx3)">${
@@ -1758,7 +2028,11 @@ function weakest(k){
     .filter(x=>x.n).sort((a,b)=>(a.m==null?-1:a.m)-(b.m==null?-1:b.m)).slice(0,k);
 }
 function renderStats(){
-  const all=allCards();
+  /* Against the pool being studied, for the same reason topicReady is: counting the
+     demoted background cards would report "6 of 286 recalled" at a reader who has
+     been through most of what the tool actually deals them. The stat row says which
+     pool it is counting. */
+  const all=allCards().filter(inPool);
   const recall=all.filter(isRecall);
   const solid=recall.filter(c=>srsGet(c.key).box>=2).length;
   const p=predict(all);
@@ -1770,7 +2044,7 @@ function renderStats(){
   const showable    = p.n>=20;
   const hero = !showable
     ? `<div class="result-hero"><div class="big" style="font-size:26px">Not enough yet</div>
-        <div class="sub">Answer <b>${20-p.n}</b> more question${20-p.n===1?'':'s'} in Drill or Written and a projected mark appears here. Guessing from ${p.n||'no'} answer${p.n===1?'':'s'} would just be making something up.</div></div>`
+        <div class="sub">Answer <b>${20-p.n}</b> more question${20-p.n===1?'':'s'} in Study and a projected mark appears here. Guessing from ${p.n||'no'} answer${p.n===1?'':'s'} would just be making something up.</div></div>`
     : `<div class="result-hero ${p.pct>=p.pass?'pass':'fail'}"><div class="big">${p.pct}%</div>
         <div class="sub">${solidEnough?'Projected mark':'Rough guess at your mark'} · ${passPhrase()} —
           ${p.pct>=p.pass?'<b>you are over the line</b> on what you have done so far':'<b>below the line</b> on what you have done so far'}</div></div>
@@ -1792,6 +2066,7 @@ function renderStats(){
         <div class="bar"><i style="width:${x.m==null?0:Math.round(x.m*100)}%"></i></div>
         <div class="sub">${x.m==null?'You have not answered anything on this one yet.':'Your weakest so far.'}
           <button class="wlink" style="margin-top:6px" data-brief="${x.cr.id}">→ Read it in the Brief</button></div></div>`).join('')}`:''}
+    ${hasBG()&&!S.bg?`<div class="doornote" style="border-left-color:var(--line2)">Counting the <b>${all.length}</b> cards you are studying. The background reading is not in these numbers — add it in <b>Study</b> and they recount.</div>`:''}
     <h2 class="sec">Topics</h2>
     ${PACK.topics.map(t=>{
       const cs=all.filter(c=>c.topic===t.id);
@@ -1816,7 +2091,7 @@ if(HASBRIEF()) $('#navBrief').hidden=false;
    the most discouraging. Once there is any progress, Learn is the right landing. */
 const coldStart=!Object.keys(S.srs).length&&!Object.keys(S.mcq).length;
 renderOnboard();
-nav(HASBRIEF()&&coldStart?'brief':'learn');
+nav(HASBRIEF()&&coldStart?'brief':'study');
 </script>
 <script>
 /* ===== STUDY BUS v2 (hub ⚡ engine — see estate STUDY-ENGINE-SPEC.md) =====
@@ -1855,7 +2130,7 @@ if(PACK.studybus&&PACK.id){
     // due first (most overdue leading), whole recall deck as fallback —
     // never let "nothing due" mean "nothing to cram".
     // Only RECALL types go on the bus: the hub's player understands flash/saq.
-    const all=cardsOf(RECALL,'all');
+    const all=cardsOf(RECALL,'all').filter(inPool);
     const now=Date.now();
     const due=all.filter(c=>srsGet(c.key).due<=now);
     return (due.length?due:all).slice()
@@ -1867,8 +2142,9 @@ if(PACK.studybus&&PACK.id){
   };
   const offers=function(){
     // evPerMin scales with how much of the deck is due — raw memory value
-    // only; the hub multiplies in exam weight, urgency and hurdle boosts
-    const all=cardsOf(RECALL,'all');
+    // only; the hub multiplies in exam weight, urgency and hurdle boosts.
+    // `inPool` so the hub's readiness bar counts the same cards the tool deals.
+    const all=cardsOf(RECALL,'all').filter(inPool);
     const due=all.filter(c=>srsGet(c.key).due<=Date.now()).length;
     const frac=all.length?due/all.length:1;
     return [{ label:'🧠 '+(PACK.title||'Cram pack'),
@@ -1888,7 +2164,9 @@ if(PACK.studybus&&PACK.id){
 const q=new URLSearchParams(location.search);
 const tp=q.get('topic'), md=q.get('mode');
 if(tp&&PACK.topics.some(t=>t.id===tp)){ S.topic=tp; save(); }
-if(md&&['brief','learn','mcq','saq','exam','search','stats','audit'].includes(md)) nav(md);
+/* learn/mcq/saq are kept here on purpose: nav() aliases them onto Study, so a hub
+   link or bookmark written before the merge still lands somewhere real. */
+if(md&&['brief','study','learn','mcq','saq','exam','search','stats','audit'].includes(md)) nav(md);
 else if(tp) nav(VIEW);   // re-render so the topic chip change shows
 })();
 </script>

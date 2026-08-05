@@ -53,14 +53,14 @@ const PACK = {
   exam: { auto: 20, saq: 4, minutes: 40, pass: 80, date: '2026-08-23' },
   topics: [ { id:'anti', name:'Antimicrobials', icon:'🦠' }, ... ],
   cards: [
-    // Flashcard — used by Learn (SRS)
+    // Flashcard — self-graded recall on the SRS
     { type:'flash', topic:'anti', q:'Question?', a:'Answer (HTML ok, <b> for emphasis)' },
 
-    // MCQ — used by Drill and the mock test. correct = index into options.
+    // MCQ — machine-marked, also drawn by the mock test. correct = index into options.
     { type:'mcq', topic:'anti', q:'Stem?', options:['a','b','c','d'], correct:2,
       why:'Shown after answering — why the right answer is RIGHT. Not a sourcing note.' },
 
-    // Written answer — used by Learn, Written, and the mock test.
+    // Written answer — reveal the marking points and tick them; also in the mock test.
     // points = the marking schedule (one tick each). model = extra notes.
     { type:'saq', topic:'anti', q:'List five… (5 marks)', marks:5,
       points:['p1','p2','p3','p4','p5'], model:'Also acceptable: …' },
@@ -93,20 +93,25 @@ const PACK = {
 
 | type | view | marks (default) |
 |---|---|---|
-| `flash` | Learn (SRS) | — |
-| `saq` | Learn, Written, Mock test | `points.length` |
-| `mcq` | Drill, Mock test | 1 |
-| `order` | Drill, Mock test | `steps.length` |
-| `cloze` | Drill, Mock test | `blanks.length` |
-| `tfset` | Drill, Mock test | **1** (all-or-nothing) |
-| `match` | Drill, Mock test | `pairs.length` |
+| `flash` | Study (self-graded, SRS) | — |
+| `saq` | Study (marking points), Mock test | `points.length` |
+| `mcq` | Study (machine-marked), Mock test | 1 |
+| `order` | Study (machine-marked), Mock test | `steps.length` |
+| `cloze` | Study (machine-marked), Mock test | `blanks.length` |
+| `tfset` | Study (machine-marked), Mock test | **1** (all-or-nothing) |
+| `match` | Study (machine-marked), Mock test | `pairs.length` |
+
+Every type is dealt from **one queue**. A card's type decides how it is presented and
+scored, not which tab it lives in — see *What the shell provides*.
 
 Override any of them with an explicit `marks:`. Every card may also carry:
 
 - `fig:'<svg…>'` + `figcap:'…'` — an inline figure above the answer area.
-- `lean:'exam'` — keep it in Learn and Drill but **exclude it from the mock test**
+- `lean:'exam'` — keep it in Study but **exclude it from the mock test**
   (for content the lecturer has said is final-exam-only).
 - `crit:'cvs-7'` — the focus point this card covers (see below).
+- `bg:true` — **background reading**: real content, but not what the course has asked
+  about. Out of the default queue, one tap puts it back. See *Background reading*.
 - `tier:` + `ev:` + `srcNote:` — where the card came from (see *Sourcing*).
 
 ### Optional: focus-point coverage
@@ -226,18 +231,27 @@ machine-marked and written marks is computed from `auto`, `saq`, `mix` and each 
 
 - **Brief** — *the only view that explains rather than asks.* One section per focus
   point, in the order the course publishes them, built from the pack's flash answers
-  as prose; read ticks and a progress bar; **▸ Drill this** scopes Learn and Drill to
+  as prose; read ticks and a progress bar; **▸ Drill this** scopes Study to
   that one focus point (announced in a banner with a one-tap clear). A reader with no
-  saved progress **lands here**, because opening in Learn asks them to retrieve facts
+  saved progress **lands here**, because opening in Study asks them to retrieve facts
   they have not encoded yet. Hidden entirely unless the pack declares `criteria`.
-- **Learn** — flashcards + written answers on a Leitner SRS (Again/Hard/Good/Easy),
-  dealt from the deck below.
-- **Drill** — every machine-marked type, shuffled, with the explanation floor below.
-- **Written** — reveal the marking schedule, tick what you got; the tick-rate feeds
-  both the SRS and the mark projection.
+- **Study** — **one queue holding every card in the pack**, dealt from the deck below.
+  Each card renders in its own form: a `flash` card flips and you grade yourself on the
+  Leitner SRS (Again/Hard/Good/Easy); an `saq` reveals its marking points for you to
+  tick, feeding both the SRS and the mark projection; the machine-marked types run their
+  runner with the explanation floor below.
+
+  This used to be three tabs — Learn, Drill and Written — split by *how a card is
+  marked*. That is a fact about the code, not about studying, and it cost the reader
+  three things: no screen could state an honest card count (Drill spoke for only the
+  machine-marked types, so on `hs2-test1` it announced "all 300 cards" of a 586-card
+  pack); every `saq` appeared in two tabs at once, since Learn's set is flash+saq and
+  Written's is saq; and three decks meant three passes with nowhere that could say you
+  had been through the pack. **If a tab name is a card type, it is not a tab.**
+  `?mode=learn|mcq|saq` still resolve, aliased onto Study.
 - **Mock test** — mixes machine-marked + written per `PACK.exam`, optional countdown,
   no feedback until the end, honest self-marking screen, pass/fail, attempt history.
-- **Search · Progress · Sources** — behind the `···` overflow. Five primary tabs is the
+- **Search · Progress · Sources** — behind the `···` overflow. Three primary tabs is the
   tool; these three are things you go and look for, not things you do.
 - **Extras** — dark/light theme, days-left pill, dismissible first-run panel,
   mobile-first (verified at 375px), Enter-key driving throughout.
@@ -289,19 +303,82 @@ if the pack is short of its declared floors, the build does not produce a page a
 Keep the build's rule identical to the engine's `validateCoverage` — including counting
 `alsoCrit` — or a build can pass while the page it produced disagrees.
 
+## Background reading
+
+A pack whose honest card count is too big to get through is a pack nobody starts.
+`hs2-test1` is 586 cards for a 65-minute test, and **346 of them are standard
+physiology sitting on focus points the lecturer's own questions already cover** — real
+content, but padding on ground the real thing already holds.
+
+Mark those `bg:true` and they leave the **default queue**. What that must never become
+is a hidden pack, so:
+
+- the switch sits above the queue **under both doors**, states both counts, and
+  restores everything in one tap;
+- they stay in the **Brief** and in **Search**, in full, always;
+- the **mock test** draws from the same pool you are studying, so it cannot ask you
+  something the queue has never shown you — and it says so on the setup screen;
+- **Progress** and per-topic readiness count that pool too, and say which one.
+
+Two gates keep it honest, and both are in `validateCoverage` **and** in `build.mjs`
+because the two must not drift: a focus point still has to clear its card floor, and a
+focus point whose cards are **all** `bg` fails the build. The floor counts the pack;
+the second counts what the reader is actually dealt. Without it a focus point can pass
+the floor on background cards alone and still answer "▸ Drill this" with an empty view.
+
+A pack that sets `bg` on nothing is unaffected: the switch never renders and the pool
+filter is the identity.
+
+## Long cloze passages
+
+Cloze cards with **4 or more blanks** are rendered as a sequence of blocks rather than
+one paragraph, with a `3 of 10 filled` counter beneath. `hs2-test1`'s biggest is 393
+words with twenty dropdowns — met as a single grey wall it was the most demoralising
+card in the pack.
+
+The card is **not** edited. Harvested cards are the lecturer's content reproduced
+unaltered and proven so by a diff against the capture, so splitting one into several
+would break that proof and change its progress key. Only the rendering is segmented:
+same text, same blanks, same marks, same key.
+
+Cuts are taken on the **raw** text — before any `<select>` exists, so a boundary can
+never land inside generated markup — at sentence ends, dash bullets and newlines, and
+each piece keeps its trailing separator so **`segments.join('') === text` exactly**.
+That is the property to preserve if you touch `clozeSegments`: it cannot drop,
+duplicate or reorder a word, and cannot orphan a `[[n]]` between two blocks. Any block
+that still holds too many blanks — the harvested slide dumps run 128 words with no full
+stop — is re-cut on blank boundaries, so no block is ever a wall.
+
 ## How cards are chosen — the deck
 
-Learn, Drill and Written all deal from an **ordered deck**, not a random draw.
-Three rules, in this order of precedence:
+Study deals from an **ordered deck**, not a random draw. Four rules, in this order of
+precedence:
 
-1. **Every card is in the deck.** Priority sets *order*, never membership. Nothing
-   is ever withheld under either door.
-2. **Topics are the outer loop.** Cards are grouped by topic, and the topics are
-   stride-merged so a topic holding *n* of *N* cards is dealt every *N/n* slots.
-   Every topic is reached in the opening handful of cards, proportional to its size.
-3. **Rank orders the cards inside a topic** — questions the lecturer has set before
+1. **Every card in the pool is in the deck.** Priority sets *order*, never
+   membership. Nothing is withheld under either door. (The pool is the whole pack
+   unless the reader has left *background reading* switched off — see above.)
+2. **Body systems are the outermost loop, when the pack declares them.** Add
+   `systems:[{id,name}]` and give each topic a `sys:` and the deck is dealt one system
+   at a time, in the declared order, finishing one before starting the next. Omit them
+   and rule 3 applies to the whole pack, exactly as before.
+3. **Topics are the next loop.** Within a system, cards are grouped by topic and the
+   topics stride-merged so a topic holding *n* of *N* cards is dealt every *N/n* slots
+   — proportional to its size, and reached in that system's opening handful.
+4. **Rank orders the cards inside a topic** — questions the lecturer has set before
    and parts of the course no practice test covers, then what you have been getting
    wrong, then what is due for review, then the rest.
+
+Rule 2 exists because stride-merging *every* topic is a round-robin: on `hs2-test1`
+twelve consecutive cards ran gas exchange → terminology → vessels → control of
+breathing → blood pressure → heart anatomy → … Twelve cold starts, and no way to
+finish a system. Declare the systems in the order the course itself publishes its
+focus points, and the door note can say so truthfully.
+
+**One trap when reporting the deck to the reader.** `cardWeak()` counts a
+never-attempted card as weak — right for ranking, since untouched is as unproven as
+failed, and false as a sentence. Reported raw it tells a cold reader that hundreds of
+cards are ones "you have been getting wrong". `deckStats` filters those out with
+`cardSeen()`; **re-derive any ranking predicate before it becomes user-facing prose.**
 
 No card repeats until the deck is exhausted, so one pass is full coverage. A card
 you get wrong is spliced back in 4 cards ahead (10 if you were only partly wrong),
