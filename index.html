@@ -288,6 +288,9 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
 .door.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .doors .iconbtn{flex:0 0 auto;width:42px;height:auto;font-weight:800}
 .doornote{font-size:12.5px;color:var(--tx2);background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5}
+/* Thin coverage. Warm border rather than the error red — this is an honest statement
+   about the course material, not a fault in the tool. */
+.thinnote{font-size:12.5px;color:var(--tx2);background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--hard);border-radius:9px;padding:9px 12px;margin:10px 0;line-height:1.5}
 /* The background-reading switch. Column-stacked so the button never gets squeezed to a
    sliver on a 375px screen, and the button is full-width there for the same reason. */
 .bgrow{display:flex;flex-direction:column;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--tx2);
@@ -308,7 +311,7 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
    cannot check a card you have not been dealt, and the person best placed to
    notice a broken answer key is whoever is reading it at the time. So browsing
    and flagging are deliberately the SAME screen, and the flag button also rides
-   along on the study card and the mock-test review, because the moment you spot a
+   along on the study card, because the moment you spot a
    bad card is the moment it is in front of you. */
 .libgrp{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:12px 14px;margin-bottom:8px;
   background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--tx);font-size:14.5px;font-weight:600;line-height:1.4;transition:.12s}
@@ -386,13 +389,14 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
     <div class="seg" id="nav">
       <button data-v="brief" id="navBrief" hidden>Brief</button>
       <button data-v="study" class="on">Study</button>
-      <button data-v="exam">Mock test</button>
+      <!-- Mock test used to sit here. Progress is promoted into the bar in its place:
+           it is now the only place a mark is reported, so it should not be behind ···. -->
+      <button data-v="stats">Progress</button>
       <button id="navMore" title="More" aria-expanded="false" aria-controls="nav2">···</button>
     </div>
     <div class="seg hidden" id="nav2">
       <button data-v="cards">All cards</button>
       <button data-v="search">Search</button>
-      <button data-v="stats">Progress</button>
       <button data-v="audit" id="navAudit" hidden>Sources</button>
     </div>
   </div>
@@ -420,8 +424,11 @@ const PACK = {
   // when it is present. Do not put a pronoun here; a shared template that assumes a
   // lecturer's gender is wrong for the next course by construction.
   lecturer: 'Dr Rangi',
-  // Mock-test composition. `auto` draws from every machine-marked type; `mix` is
-  // optional and sets the share of each type (remainder filled at random).
+  // Describes the REAL sitting. Nothing simulates the paper any more (the mock test
+  // was removed — see "Mock test: REMOVED" below), but this is still load-bearing:
+  // `auto`/`saq`/`minutes` are quoted in the first-run panel, and `auto`/`saq`/`mix`
+  // feed paperWeights(), which is how the Progress projection weights the written and
+  // machine-marked halves the way the real paper weights its marks.
   // OPTIONAL `date` (YYYY-MM-DD) puts a days-left counter in the header and feeds
   // the first-run panel. Omit it and both simply do not render.
   // `pass` is the benchmark. Set `passIsTarget:true` when the course does NOT publish
@@ -551,7 +558,7 @@ function ckey(c){ return hash(c.type+'|'+strip(c.q)+'|'+csig(c)); }
 const ckeyLegacy=c=>hash(c.type+'|'+strip(c.q));   // v2 keys, for migration only
 
 /* ---- card taxonomy ----
-   AUTO   = machine-marked; live in the Drill view and the mock test
+   AUTO   = machine-marked; live in the Drill view
    RECALL = you grade yourself; live in Learn on the Leitner SRS          */
 const AUTO=['mcq','order','cloze','tfset','match'];
 const RECALL=['flash','saq'];
@@ -625,22 +632,26 @@ function validatePack(p){
    Optional. A pack with no PACK.criteria simply skips this.               */
 function validateCoverage(p){
   if(!p.criteria||!p.criteria.length) return [];
-  const cfg=Object.assign({min:0,blindMin:0,blindNeedsSaq:false},p.coverage||{});
   const errs=[];
+  const thin=new Set((p.thin||[]).map(t=>t.id));
   p.criteria.forEach(cr=>{
     /* A card that ALSO covers this focus point counts toward it — the Brief already
        files it under both. Counting only `crit` here made the engine disagree with
        build.mjs, which has always counted both: the build could pass while the page
        reported a failure, which is precisely the split that let a self-warning ship. */
     const cs=(p.cards||[]).filter(c=>c.crit===cr.id||(c.alsoCrit||[]).includes(cr.id));
-    const floor=cr.blind?Math.max(cfg.min,cfg.blindMin):cfg.min;
-    if(cs.length<floor) errs.push(`focus point "${cr.name||cr.id}" has ${cs.length} cards, needs ${floor}`);
-    /* A focus point whose cards are ALL `bg` passes the floor above and is still
-       unreachable from the default queue: the Brief offers "▸ Drill this" and Study
-       answers "no cards in this topic". The floor counts the pack; this counts what
-       the reader is dealt. */
-    if(cs.length&&cs.every(c=>c.bg)) errs.push(`focus point "${cr.name||cr.id}" has ${cs.length} cards but every one is background reading — nothing to drill in the default queue`);
-    if(cr.blind&&cfg.blindNeedsSaq&&!cs.some(c=>c.type==='saq')) errs.push(`focus point "${cr.name||cr.id}" is never practised anywhere in the course and has no written-answer card`);
+    /* EMPTY is the only authoring error left here. The card floor used to live in this
+       function too, and it was the thing that kept twelve focus points topped up with
+       cards written for no reason but to clear it. A pack that ships only sourced
+       material cannot clear a floor by authoring, so being under it is a fact to
+       DECLARE (PACK.thin, rendered in the Brief) and not an error to report.
+       build.mjs holds the matching rule. */
+    if(!cs.length) errs.push(`focus point "${cr.name||cr.id}" has no cards at all`);
+    /* The declaration must be true. A pack claiming thin coverage on a focus point that
+       is not in PACK.thin, or the reverse, means the two went out of sync in the
+       generator and the reader is being told the wrong thing. */
+    else if(thin.has(cr.id)!==((p.thin||[]).some(t=>t.id===cr.id&&t.n===cs.length)))
+      errs.push(`focus point "${cr.name||cr.id}" is declared thin at a count that does not match its ${cs.length} cards`);
   });
   return errs;
 }
@@ -673,7 +684,11 @@ function load(){
   /* `flags` lives in the same blob as progress on purpose: Cloud.sync already carries
      this key, so a card flagged on a phone mid-revision is waiting on the laptop that
      can actually fix it. No new storage, no new sync path. */
-  return {v:3,theme:'dark',topic:'all',door:'ready',bg:false,srs:{},mcq:{},exams:[],read:{},saq:{},
+  /* `exams:[]` used to sit here, holding the mock-test score history. The view is gone;
+     the key is deliberately NOT migrated away, because a saved blob from before this
+     build still carries it and dropping it on load would be a destructive write to a
+     Cloud.sync'd record for no gain. It is simply never read again. */
+  return {v:3,theme:'dark',topic:'all',door:'ready',bg:false,srs:{},mcq:{},read:{},saq:{},
           flags:{},libGroup:'topic',libAt:null,libAns:true};
 }
 /* v1 keyed progress by card index · v2 by a hash of the question · v3 adds the
@@ -733,7 +748,7 @@ const cardsOf=(type,topic)=>{ const ts=Array.isArray(type)?type:[type];
 /* ============ interactive question runners (the AUTO types) ============
    A "runner" holds one attempt at one card: the shuffled presentation
    order, the response so far, and whether it's been revealed. The same
-   three functions drive the Drill view, the mock test and its review. */
+   three functions drive the Drill view. */
 function makeRunner(c,resp){
   const r={c,rev:false,resp:null};
   switch(c.type){
@@ -901,7 +916,7 @@ function briefLink(c){
   const cr=(PACK.criteria||[]).find(x=>x.id===c.crit); if(!cr) return '';
   return `<button class="wlink" data-brief="${c.crit}">→ Read the full explanation: ${esc(cr.name||cr.id)}</button>`;
 }
-/* One feedback block, used by the Drill view and by the mock-test review, so the floor
+/* One feedback block, used by the Drill view, so the floor
    cannot be honoured in one place and forgotten in the other.
 
    The two halves are additive, not either/or. What the right answer WAS always shows —
@@ -1050,7 +1065,7 @@ function wireRunner(root,r,onChange){
     });
   }
   /* The counter is updated HERE rather than in the view's refresh, so it works in the
-     mock test too — and in place rather than by re-render, which would drop the
+     in place rather than by re-render, which would drop the
      reader's scroll position halfway down a ten-blank passage. */
   if(c.type==='cloze') root.querySelectorAll('select[data-b]').forEach(s=>s.onchange=()=>{
     r.resp[+s.dataset.b]= s.value===''?null:+s.value;
@@ -1084,7 +1099,8 @@ $('#btnTheme').onclick=()=>{S.theme=S.theme==='dark'?'light':'dark';save();apply
 applyTheme();
 
 /* ---- the benchmark, and whether we are allowed to call it a pass mark ----------
-   `exam.pass` is the number the mock test and the readiness readout mark against.
+   `exam.pass` is the number the Progress projection and the readiness readout mark
+   against. (It used to serve the mock test too; that view is gone — see below.)
    Plenty of courses never publish one — Health Science 2 specifies everything else
    about its tests (duration, question count, SAQ share, conditions, weighting) and
    states no pass mark anywhere, and the number this pack carried turned out to be
@@ -1093,7 +1109,7 @@ applyTheme();
 
    So a pack that has not sourced its number sets `exam.passIsTarget:true`, and every
    string that mentions it says TARGET and says whose it is. A benchmark is still
-   useful — the mock test needs something to mark against, and aiming at a bare pass
+   useful — the projection needs something to mark against, and aiming at a bare pass
    is bad advice — but the tool must not invent a requirement and attribute it to the
    course. Packs whose pass mark IS published leave the flag off and read as before. */
 const PASSMARK=()=>((PACK.exam&&PACK.exam.pass)||80);
@@ -1127,7 +1143,7 @@ function daysLeft(){
 
 /* Source badges are wired by delegation: the card views re-render constantly and
    per-render wiring would have to be repeated in each of them. Deliberately NOT added
-   to the mock test — knowing mid-question that a card is background reading is a hint
+   knowing mid-question that a card is background reading is a hint
    the real paper will not give you. It appears in the review afterwards instead. */
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-prov]'); if(!b) return;
@@ -1344,7 +1360,7 @@ function wireFlagPanel(slot,ck,btn){
     if(VIEW==='cards'&&S.libAt==='_flagged'){ libFlagged(); return; }
     const lc=btn.closest('.libcard'), c=allCards().find(x=>x.key===ck);
     if(lc&&c){ lc.outerHTML=libCardHTML(c); return; }   // delegated handlers, so the fresh node is live
-    refreshBtn(); close();                              // study card / mock-test review
+    refreshBtn(); close();                              // study card
   };
   if(sv) sv.onclick=()=>{
     if(!sel) return;
@@ -1455,7 +1471,7 @@ function renderLibrary(){
       <p style="color:var(--tx2);font-size:14px;line-height:1.6;margin:2px 0 10px">
         The whole pack, standing still. Nothing is scheduled and nothing is left out${nbg?`, including the ${nbg} cards held back from the study queue`:''} — open a group and read the questions and their answers straight through.</p>
       <p style="color:var(--tx2);font-size:14px;line-height:1.6;margin:0">
-        If a question or an answer looks wrong, hit <b>⚑ Flag</b> on it. The same button is on every card in Study and in the mock-test review.</p>
+        If a question or an answer looks wrong, hit <b>⚑ Flag</b> on it. The same button is on every card in Study.</p>
     </div>
     <div class="chips" style="margin-top:14px" id="libModes">
       ${libModes().map(m=>`<button class="chip${m.id===mode?' on':''}" data-lm="${m.id}">${m.lab}</button>`).join('')}
@@ -1537,7 +1553,7 @@ function libFlagged(){
    are things you go and look for rather than things you do, so they live behind the
    ··· — a six-way choice on first contact is a tax paid by every user for three views
    most of them will open twice. */
-let VIEW='study', CUR=null, EX=null;
+let VIEW='study', CUR=null;
 const view=$('#view');
 const SECOND=['cards','search','stats','audit'];
 const navBtns=()=>$$('#nav button[data-v], #nav2 button[data-v]');
@@ -1546,7 +1562,7 @@ function showMore(on){
   $('#navMore').classList.toggle('on',on);
   $('#navMore').setAttribute('aria-expanded',String(on));
 }
-const VIEWS={brief:renderBrief,study:renderStudy,exam:renderExamSetup,cards:renderLibrary,search:renderSearch,stats:renderStats,audit:renderAudit};
+const VIEWS={brief:renderBrief,study:renderStudy,cards:renderLibrary,search:renderSearch,stats:renderStats,audit:renderAudit};
 /* learn / mcq / saq were three tabs before the queues merged. The hub deep-links by
    mode and a reader may have bookmarked one, so they alias onto Study rather than
    landing on a blank view. */
@@ -1945,6 +1961,20 @@ function critRank(cr){
   if(!read) return 2;
   return 3;
 }
+/* THIN COVERAGE, SAID OUT LOUD.
+   A pack that ships only material sourced back to the course cannot top a focus point
+   up by authoring — so where the course itself is thin, the tool is thin, and the
+   reader has to be told which is which. Without this the two are indistinguishable:
+   two cards on carbon dioxide transport reads as "this barely matters" when it
+   actually means "this is everything she has ever asked about it".
+
+   Declared by the pack (PACK.thin), never inferred here — the same rule as `counts`
+   and `scope` on the study bus. A pack with no `thin` renders nothing. */
+function thinNote(id){
+  const t=(PACK.thin||[]).find(x=>x.id===id);
+  if(!t) return '';
+  return `<div class="thinnote">⚠️ <b>Thin ground.</b> ${t.n===1?'This is the only card':`These are the only ${t.n} cards`} in the pack on this focus point — it is on the published list, but there is little in the course material to build from. Everything here is still ${esc(PACK.lecturer||'the lecturer')}'s; there is just not much of it. Worth reading around.</div>`;
+}
 function factHTML(c){
   const body=c.type==='flash'
     ? `<div class="facta">${c.a}</div>`
@@ -1988,6 +2018,7 @@ function renderBrief(){
           <h3>${esc(cr.name||cr.id)}</h3>${cr.blind?`<span class="blindtag">never practised</span>`:''}</div>
         <div class="brfsub">${tp?esc(topicName(tp))+' · ':''}${cs.length} card${cs.length===1?'':'s'} · ${
           m!=null?`${Math.round(m*100)}% mastered`:'not drilled yet'}</div>
+        ${thinNote(cr.id)}
         ${prose.length?prose.map(factHTML).join('')
           :`<div class="hinttxt">No written summary for this one yet — go straight to drilling it.</div>`}
         <div class="brfact">
@@ -2180,165 +2211,21 @@ function studyAuto(G,head,c,tot){
   document.onkeydown=e=>{ if(VIEW==='study'&&e.key==='Enter'&&$('#submit')&&!$('#submit').disabled) grade(); };
 }
 
-/* ---- Mock test ---- */
-const examEligible=c=>c.lean!=='exam';          // cards flagged as final-exam-only sit out
-const blindCrits=()=>new Set((PACK.criteria||[]).filter(c=>c.blind).map(c=>c.id));
-function drawPool(cards){                        // never-practised focus points get 2× weight until nailed
-  const bc=blindCrits(), out=[];
-  cards.forEach(c=>{ out.push(c);
-    const m=S.mcq[c.key], mastered=m&&m.t&&m.g/m.t>=1;
-    if(bc.has(c.crit)&&!mastered) out.push(c);
-  });
-  return out;
-}
-function takeUnique(pool,n){ const seen=new Set(),out=[];
-  for(const c of shuffle(pool)){ if(seen.has(c.key))continue; seen.add(c.key); out.push(c); if(out.length>=n)break; }
-  return out; }
-/* The mock test sits the pool you are STUDYING, not the whole pack. Drawing questions
-   from cards the queue never deals would test a reader on material the tool had
-   decided not to show them — the one thing a practice paper must not do. Turn the
-   background reading on and the mock test widens with it. */
-function drawAuto(n,mix){
-  const elig=cardsOf(AUTO,'all').filter(examEligible).filter(inPool);
-  let out=[];
-  if(mix) for(const t in mix){
-    const sub=elig.filter(c=>c.type===t);
-    out=out.concat(takeUnique(drawPool(sub),Math.min(Math.round(n*mix[t]),sub.length)));
-  }
-  if(out.length<n){ const have=new Set(out.map(c=>c.key));
-    // When a pack DECLARES a mix, the top-up must stay inside it. Filling from every
-    // eligible type let card types the pack had deliberately left out of the mix back
-    // into the exam — hs2-test1 excludes `order` because no ordering question exists on
-    // the real paper, and the fallback would have quietly reintroduced it.
-    const pool=mix?elig.filter(c=>mix[c.type]!=null):elig;
-    out=out.concat(takeUnique(drawPool(pool.filter(c=>!have.has(c.key))),n-out.length)); }
-  return out.slice(0,n);
-}
-function renderExamSetup(){
-  const cfg=Object.assign({auto:10,saq:2,minutes:0,pass:80},PACK.exam||{});
-  if(PACK.exam&&PACK.exam.mcq!=null&&PACK.exam.auto==null) cfg.auto=PACK.exam.mcq;   // legacy packs
-  const autoAll=cardsOf(AUTO,'all').filter(examEligible).filter(inPool),
-        saqAll=cardsOf('saq','all').filter(examEligible).filter(inPool);
-  const nA=Math.min(cfg.auto,autoAll.length), nS=Math.min(cfg.saq,saqAll.length);
-  const last=S.exams[0];
-  view.innerHTML=`
-    <div class="card setup">
-      <h3>🎯 Mock test</h3>
-      <p>A full practice run under the real conditions: <b>${nA}</b> marked-for-you + <b>${nS}</b> written questions, every topic mixed${cfg.minutes?`, <b>${cfg.minutes} minutes</b> on the clock`:''}. Nothing is marked until the end. Marked ${passPhrase()}.</p>
-      ${PASSTARGET()?`<p style="font-size:12.5px;color:var(--tx3);margin:-8px 0 14px">${passCaveat()}</p>`:''}
-      ${cfg.noPaper?`<div class="packwarn">✋ <b>No rough paper.</b> That's the real condition — work the multi-step questions in your head, not on a pad.</div>`:''}
-      ${hasBG()&&!S.bg?`<p style="font-size:12.5px;color:var(--tx3);margin:-8px 0 14px">Drawn from the <b>${autoAll.length+saqAll.length}</b> questions you are studying — so it cannot ask you something the queue has never shown you. Add the other cards in <b>Study</b> and this widens with them.</p>`:''}
-      ${nA+nS>0?`<button class="bigstart" id="start">START THE MOCK TEST</button>`:`<div class="empty">This pack has no questions to sit yet — a mock test needs at least one.</div>`}
-      ${last?`<p style="margin:12px 0 0;text-align:center">Last attempt: <b>${last.score}%</b> ${last.pass?'✅':'❌'}</p>`:''}
-      ${PACK.exam&&PACK.exam.date&&daysLeft()!=null&&daysLeft()>=0?`<p style="margin:8px 0 0;text-align:center;font-size:12.5px;color:var(--tx3)">${
-        daysLeft()===0?'The real one is today.':daysLeft()===1?'The real one is tomorrow.':`${daysLeft()} days until the real one.`}</p>`:''}
-    </div>`;
-  if(nA+nS===0) return;
-  $('#start').onclick=()=>{
-    EX={qs:shuffle(drawAuto(nA,cfg.mix).concat(takeUnique(saqAll,nS))),
-        i:0,resp:[],cfg,end:cfg.minutes?Date.now()+cfg.minutes*60e3:null,timer:null};
-    renderExamQ();
-    if(EX.end){ EX.timer=setInterval(()=>{ const el=$('#extimer'); if(!el){clearInterval(EX.timer);return;}
-      const left=EX.end-Date.now(); if(left<=0){ examMark(); return; }
-      el.textContent=`${Math.floor(left/60e3)}:${String(Math.floor(left%60e3/1e3)).padStart(2,'0')}`;
-      el.classList.toggle('low',left<60e3); },250); }
-  };
-}
-function renderExamQ(){
-  const q=EX.qs[EX.i], tot=cardMarks(q);
-  const head=`<div class="topbar"><span>Question <b>${EX.i+1}</b> / ${EX.qs.length}</span>${EX.end?`<span class="timer" id="extimer">–:––</span>`:''}</div>
-    <div class="tprog"><i style="width:${EX.i/EX.qs.length*100}%"></i></div>`;
-  if(q.type==='saq'){
-    view.innerHTML=head+`<div class="card">
-      <div class="cmeta"><span class="tag acc">${topicName(q.topic)}</span><span class="tag right">${tot} marks</span></div>
-      <div class="q">${q.q}</div>${figHTML(q)}
-      <div class="hinttxt">Answer in full (out loud, or on paper if your real sitting allows it) — you'll self-mark it in the review.</div>
-      <div class="btnrow"><button class="btn primary" id="donesaq">Answered — next</button></div></div>`;
-    $('#donesaq').onclick=()=>{ EX.resp[EX.i]=null; nextExam(); };
-    return;
-  }
-  const r=makeRunner(q);
-  view.innerHTML=head+`<div class="card">
-      <div class="cmeta"><span class="tag acc">${topicName(q.topic)}</span><span class="tag">${tot} mark${tot>1?'s':''}</span><span class="tag right">${TYPELABEL[q.type]}</span></div>
-      <div class="q">${q.q}</div>${figHTML(q)}
-      <div id="body">${runnerHTML(r)}</div>
-      <div class="btnrow"><button class="btn primary" id="exnext">${q.type==='mcq'?'Skip →':'Next →'}</button></div>
-    </div>`;
-  const refresh=()=>{
-    if(q.type==='order'){ $('#body').innerHTML=runnerHTML(r); wireRunner($('#body'),r,refresh); }
-    $('#exnext').textContent=runnerDone(r)?'Next →':'Skip →';
-    if(q.type==='mcq'&&runnerDone(r)){ EX.resp[EX.i]=r.resp; nextExam(); }
-  };
-  wireRunner($('#body'),r,refresh);
-  $('#exnext').onclick=()=>{ EX.resp[EX.i]=r.resp; nextExam(); };   // partial answers still score their parts
-}
-function nextExam(){ EX.i++; EX.i>=EX.qs.length?examMark():renderExamQ(); }
-function examMark(){
-  clearInterval(EX.timer);
-  EX.marks=EX.qs.map((q,i)=> q.type==='saq'
-    ? {got:0, tot:cardMarks(q), ticks:q.points.map(()=>false)}
-    : Object.assign(markAuto(q,EX.resp[i]),{ticks:[]}) );
-  // auto-marked results feed the per-card accuracy record — but only for
-  // questions actually reached, so a timer expiry doesn't fake a pile of misses
-  EX.qs.forEach((q,i)=>{ if(q.type==='saq'||EX.resp[i]===undefined) return;
-    const m=S.mcq[q.key]||{a:0,c:0}; m.a++; if(EX.marks[i].got===EX.marks[i].tot) m.c++;
-    m.g=(m.g||0)+EX.marks[i].got; m.t=(m.t||0)+EX.marks[i].tot; S.mcq[q.key]=m; });
-  save();
-  EX.qs.some(q=>q.type==='saq') ? renderExamReview() : examResults();
-}
-function renderExamReview(){
-  view.innerHTML=`<div class="card setup"><h3>Self-mark your written answers</h3>
-    <p>For each marked question, tick the points you actually got — honest marking is the whole game.</p></div>`+
-    EX.qs.map((q,i)=>{
-      if(q.type!=='saq') return '';
-      return `<div class="rev"><div class="rhead"><span class="ic">✍️</span><span class="qq">${q.q}</span></div>
-        <div class="rbody"><ul class="points" id="ep${i}">${q.points.map((p,k)=>`<li data-q="${i}" data-k="${k}"><span class="n">${k+1}</span><span>${p}</span></li>`).join('')}</ul>
-        ${q.model?`<div class="why" style="margin-top:10px">💡 ${q.model}</div>`:''}</div></div>`;
-    }).join('')+
-    `<div class="btnrow"><button class="btn primary" id="finish">Finish & score</button></div>`;
-  $$('.points li').forEach(li=>li.onclick=()=>{
-    li.classList.toggle('got');
-    const m=EX.marks[+li.dataset.q]; m.ticks[+li.dataset.k]=li.classList.contains('got');
-    m.got=m.ticks.filter(Boolean).length;
-  });
-  $('#finish').onclick=examResults;
-  window.scrollTo({top:0});
-}
-function examResults(){
-  const got=EX.marks.reduce((a,m)=>a+m.got,0), tot=EX.marks.reduce((a,m)=>a+m.tot,0);
-  const score=Math.round(got/tot*100), pass=score>=(EX.cfg.pass||80);
-  /* Written answers self-marked in the mock test count toward the mark projection
-     exactly as the ones in the Written view do — the projection would otherwise say
-     "no written answers at all" to someone who has just sat a full paper. Guarded on
-     ticks so a run abandoned before the self-mark screen records nothing. */
-  EX.qs.forEach((q,i)=>{ const m=EX.marks[i];
-    if(q.type!=='saq'||!m||!m.ticks||!m.ticks.length) return;
-    const sm=S.saq[q.key]||{g:0,t:0}; sm.g+=m.got; sm.t+=m.tot; S.saq[q.key]=sm; });
-  S.exams.unshift({d:new Date().toISOString().slice(0,10),score,pass}); S.exams=S.exams.slice(0,12); save();
-  view.innerHTML=`
-    <div class="result-hero ${pass?'pass':'fail'}"><div class="big">${score}%</div>
-      <div class="sub"><b>${got} / ${tot}</b> marks · ${passWord()} ${EX.cfg.pass||80}% — ${
-        pass?(PASSTARGET()?'<b>TARGET MET</b> 🎉':'<b>PASSED</b> 🎉'):'keep drilling — the review below is where the marks are.'}</div></div>
-    ${EX.qs.map((q,i)=>{
-      const m=EX.marks[i], ic=m.got===m.tot?'✅':m.got?'➖':'❌';
-      const head=`<div class="rhead" data-i="${i}"><span class="ic">${ic}</span><span class="qq">${q.q}</span><span style="font-weight:800">${m.got}/${m.tot}</span></div>`;
-      /* Flagging appears in the REVIEW and never during the paper — same rule as the
-         source badges. Mid-question it would be a hint the real sitting will not
-         give you; afterwards, a mark you are sure is wrong is the single best
-         moment anyone ever gets to catch a bad answer key. */
-      const flag=`<div class="revflag">${flagBtnHTML(q.key)}</div><div class="flagslot"></div>`;
-      if(q.type==='saq') return `<div class="rev">${head}
-        <div class="rbody hidden" id="rb${i}"><ul class="points">${q.points.map((p,k)=>`<li class="${m.ticks[k]?'got':''}"><span class="n">${k+1}</span><span>${p}</span></li>`).join('')}</ul>${flag}</div></div>`;
-      const r=makeRunner(q,EX.resp[i]); r.rev=true;
-      return `<div class="rev">${head}
-        <div class="rbody hidden" id="rb${i}">${figHTML(q)}${runnerHTML(r)}${feedbackHTML(q,EX.resp[i])}${flag}</div></div>`;
-    }).join('')}
-    <div class="btnrow"><button class="btn primary" id="again">Run it again</button><button class="btn ghost" id="toStats">Progress</button></div>`;
-  $$('.rhead[data-i]').forEach(h=>h.onclick=()=>{const b=$('#rb'+h.dataset.i); if(b)b.classList.toggle('hidden');});
-  $('#again').onclick=renderExamSetup;
-  $('#toStats').onclick=()=>nav('stats');
-  window.scrollTo({top:0});
-}
+/* ---- Mock test: REMOVED ----
+   There was a full practice paper here — timed, drawn to the real paper's question
+   mix, self-marked, with a score history on the Progress view. It is gone deliberately.
+
+   It marked against exam.pass, a number this course does not publish, and dressed a
+   sample of the same cards the queue deals as a prediction of a sitting it cannot
+   model. What it actually measured was how well you did on twenty cards you had
+   already met, reported as a percentage that looked official. Repetition plus an
+   honest Progress view does the same job without the theatre.
+
+   Kept, because the real paper still exists and the reader still has to plan for it:
+   exam.date drives the countdown; exam.auto / exam.saq / exam.minutes describe the
+   sitting in the onboarding; and paperWeights still weights the Progress projection
+   the way the real paper weights its marks. That projection reads S.mcq and S.saq —
+   study state — so it never depended on this view at all. */
 
 /* ---- Search ---- */
 function renderSearch(){
@@ -2455,7 +2342,11 @@ function renderStats(){
     <div class="statgrid">
       <div class="stat"><div class="n">${solid}<span style="font-size:15px;color:var(--tx3)">/${recall.length}</span></div><div class="l">recalled right, twice over</div></div>
       <div class="stat"><div class="n">${p.nAuto?p.nAuto:'—'}</div><div class="l">${p.nAuto?'questions drilled':'nothing drilled yet'}</div></div>
-      <div class="stat"><div class="n">${S.exams.length?S.exams[0].score+'%':'—'}</div><div class="l">${S.exams.length?'last mock test':'no mock test yet'}</div></div>
+      <!-- Was "last mock test". A one-off score on a sample of cards you had already
+           met told you less than the plainest fact in the tool: how much of the deck
+           you have still never laid eyes on. That is the number that decides whether
+           tonight is revision or first contact. -->
+      <div class="stat"><div class="n">${all.filter(c=>!srsGet(c.key).seen).length}</div><div class="l">never seen yet</div></div>
     </div>
     ${weak.length?`<h2 class="sec">Where the next half hour goes</h2>
       ${weak.map(x=>`<div class="catstat"><div class="top"><b>${esc(x.cr.name||x.cr.id)}</b><span class="m">${
@@ -2475,8 +2366,6 @@ function renderStats(){
         <div class="bar"><i style="width:${pct}%"></i></div>
         <div class="sub">${recTot?`${rec} of ${recTot} recalled right twice over`:'nothing to recall here'}${a?` · ${a.pct}% of drill marks (${a.tries} tries)`:' · not drilled yet'}</div></div>`;
     }).join('')}
-    ${S.exams.length?`<h2 class="sec">Mock tests</h2>${S.exams.map(e=>`<div class="histrow"><span>${e.d}</span><span class="sc">${e.score}%</span><span class="pf ${e.pass?'p':'f'}">${
-      PASSTARGET()?(e.pass?'ON TARGET':'UNDER'):(e.pass?'PASS':'FAIL')}</span></div>`).join('')}`:''}
     <div class="btnrow" style="margin-top:22px"><button class="btn ghost danger" id="reset">Reset all progress</button></div>`;
   $('#reset').onclick=()=>{ if(confirm('Wipe all progress for this pack?')){ localStorage.removeItem(KEY); S=load(); save(); renderStats(); } };
 }
@@ -2563,7 +2452,7 @@ const tp=q.get('topic'), md=q.get('mode');
 if(tp&&PACK.topics.some(t=>t.id===tp)){ S.topic=tp; save(); }
 /* learn/mcq/saq are kept here on purpose: nav() aliases them onto Study, so a hub
    link or bookmark written before the merge still lands somewhere real. */
-if(md&&['brief','study','learn','mcq','saq','exam','cards','search','stats','audit'].includes(md)) nav(md);
+if(md&&['brief','study','learn','mcq','saq','cards','search','stats','audit'].includes(md)) nav(md);
 else if(tp) nav(VIEW);   // re-render so the topic chip change shows
 })();
 </script>
