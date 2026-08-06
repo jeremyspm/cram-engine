@@ -1799,7 +1799,17 @@ function cardWeak(c){
    set in the past. */
 function cardRank(c,cm){
   const cr=cm[c.crit];
-  if(cardWeak(c)&&((cr&&cr.blind)||c.tier==='verbatim')) return 0;
+  /* A weak rail ranks with the lecturer's own questions, not behind them.
+
+     It is not one of her questions and does not pretend to be — but ranked on tier
+     alone every rail landed in band 1, behind 202 band-0 cards, so the first one
+     appeared at position 107 of 300 and a normal session never reached one. A feature
+     nobody is dealt is not a feature.
+
+     It also earns the place: a rail is the chain fifteen separate facts hang off, so
+     meeting it early is what makes the questions that follow cohere rather than
+     arrive as trivia. The stride-merge by topic keeps them from clumping. */
+  if(cardWeak(c)&&((cr&&cr.blind)||c.tier==='verbatim'||c.type==='rail')) return 0;
   if(cardWeak(c)) return 1;
   if(isRecall(c)&&srsGet(c.key).due<=Date.now()) return 2;
   return 3;
