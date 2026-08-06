@@ -334,6 +334,12 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
 /* The original question, behind a disclosure. Quiet by default — it is provenance, not
    the thing being studied — but full contrast once opened, because the whole point is
    that it can actually be read and checked. */
+/* One part of a long answer. Real separation, and a leading bold reads as the little
+   heading it was always written to be. `.run` is the marker for that; the space above
+   is larger than the space inside, so the eye groups each part correctly. */
+.pblk{margin:0}
+.pblk+.pblk{margin-top:13px}
+.pblk.run>b:first-child{display:block;margin-bottom:3px;color:var(--tx);font-weight:800;letter-spacing:.005em}
 .damaged{margin-top:9px;font-size:12.5px;line-height:1.55;color:var(--tx2);background:var(--gHard);
   border:1px solid var(--bHard);border-radius:9px;padding:9px 12px}
 .damaged .dm2{display:block;margin-top:5px;color:var(--tx3);font-size:11.5px}
@@ -1344,10 +1350,31 @@ function clozeFilled(c){
    Three of this pack's imported keys have already turned out to be wrong, every one
    caught by a human reading the card. Hiding the options is hiding the evidence. The
    same applied to a match card's distractors and a cloze blank's options. */
+/* PARAGRAPHS, FROM STRUCTURE THAT WAS ALREADY THERE.
+
+   The long answers are not shapeless — 38 of the 40 answers over 90 words are already
+   written as "<b>1. Where its blood comes from.</b> …<br><br><b>2. What it perfuses.</b> …".
+   The structure is in the markup and the renderer was throwing it away: a doubled <br>
+   collapses to one thin line break, so a 274-word answer with three clearly labelled
+   parts arrived as one grey slab. That is the "paragraph for a card" complaint, and it
+   is a typography bug rather than an authoring one.
+
+   So: split on doubled breaks and give each part a real block, with a leading <b> read
+   as a run-in heading. Purely presentational — the stored text is untouched, nothing is
+   reordered or dropped, and an answer with no doubled break simply becomes one block.
+   Done here rather than in the pack so every card gets it, including the lecturer's own
+   verbatim ones, which may not be edited. */
+function proseHTML(html){
+  const s=String(html==null?'':html);
+  if(!s.trim()) return '';
+  const parts=s.split(/(?:<br\s*\/?>\s*){2,}/i).map(x=>x.trim()).filter(Boolean);
+  if(parts.length<2) return `<div class="pblk">${s}</div>`;
+  return parts.map(p=>`<div class="pblk${/^<b>/i.test(p)?' run':''}">${p}</div>`).join('');
+}
 const optLine=(txt,ok)=>`<div class="optl${ok?' ok':''}"><span class="mk">${ok?'✓':'·'}</span><span>${txt}</span></div>`;
 function answerHTML(c){
   switch(c.type){
-    case 'flash': return c.a||'';
+    case 'flash': return proseHTML(c.a);
     case 'mcq':   return (c.options||[]).map((o,i)=>optLine(o,i===c.correct)).join('');
     /* The completed passage, not a numbered list of the blanks. A cloze card's
        answer IS the sentence read through with the gaps filled — checking one
@@ -2069,7 +2096,7 @@ function thinNote(id){
 }
 function factHTML(c){
   const body=c.type==='flash'
-    ? `<div class="facta">${c.a}</div>`
+    ? `<div class="facta">${proseHTML(c.a)}</div>`
     : `<ul class="factpts">${(c.points||[]).map(p=>`<li>${p}</li>`).join('')}</ul>`;
   return `<div class="fact"><div class="factq">${c.q}${provHTML(c)}</div>${body}${figHTML(c)}<div class="provslot"></div></div>`;
 }
@@ -2236,7 +2263,7 @@ function studyFlash(G,head,c){
       <div id="ansZone"><div class="btnrow"><button class="btn primary" id="flip">Show answer ↵</button></div></div>
     </div>`;
   const flip=()=>{
-    $('#ansZone').innerHTML=`<div class="answer"><div class="lab">Answer</div><div class="txt">${c.a}</div>${srcHTML(c)}</div>`+RATEROW;
+    $('#ansZone').innerHTML=`<div class="answer"><div class="lab">Answer</div><div class="txt">${proseHTML(c.a)}</div>${srcHTML(c)}</div>`+RATEROW;
     wireRate(c);
   };
   $('#flip').onclick=flip;
