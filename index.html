@@ -331,6 +331,33 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
 .liba b{color:var(--tx)}
 .liba .lb{display:block;font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--tx3);margin-bottom:3px}
 .libwhy{margin-top:8px;font-size:13px;line-height:1.55;color:var(--tx3)}
+/* The original question, behind a disclosure. Quiet by default — it is provenance, not
+   the thing being studied — but full contrast once opened, because the whole point is
+   that it can actually be read and checked. */
+.qorig{margin-top:8px}
+.qorig>summary{cursor:pointer;font-size:11.5px;font-weight:700;color:var(--tx3);list-style:none;
+  display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:7px;
+  background:var(--card2);border:1px solid var(--line)}
+.qorig>summary::-webkit-details-marker{display:none}
+.qorig>summary::before{content:"↩";font-size:11px}
+.qorig>summary:hover{color:var(--tx2)}
+.qorig[open]>summary{margin-bottom:7px}
+.qorig .qo{font-size:13px;line-height:1.6;color:var(--tx2);white-space:pre-wrap;overflow-wrap:anywhere;
+  padding:9px 12px;border-radius:9px;background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--line2)}
+.qorig .qon{font-size:11.5px;line-height:1.5;color:var(--tx3);margin-top:6px;font-style:italic}
+/* Full choice sets in All cards / Search. The key is legible at a glance and the
+   distractors stay readable rather than decorative — the point is to be able to judge
+   whether the key beats them, which needs both at proper contrast. */
+.optl{display:flex;gap:7px;align-items:flex-start;padding:2px 0;color:var(--tx3)}
+.optl.ok{color:var(--tx);font-weight:700}
+.optl .mk{flex:0 0 auto;width:12px;text-align:center;color:var(--tx3)}
+.optl.ok .mk{color:var(--good)}
+.optset{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:7px;padding-top:7px;border-top:1px dotted var(--line2)}
+.optset .bn{flex:0 0 auto;font-size:10px;font-weight:800;min-width:16px;height:16px;line-height:16px;text-align:center;
+  border-radius:5px;background:var(--card2);color:var(--tx3);border:1px solid var(--line)}
+.optset .opt{font-size:12px;padding:2px 7px;border-radius:6px;background:var(--card2);color:var(--tx3);border:1px solid var(--line)}
+.optset .opt.ok{background:var(--gGood);color:var(--good);border-color:var(--bGood);font-weight:750}
+.optset .dl{font-size:11px;color:var(--tx3);font-style:italic}
 .libcard .figwrap{margin-top:10px}
 .libstale{margin-top:8px;font-size:12.5px;line-height:1.5;color:var(--hard)}
 /* The flag control. Quiet until it has been used — an outline button that turns
@@ -831,6 +858,24 @@ function provHTML(c){
   const t=provOf(c); if(!t) return '';
   return `<button class="prov ${t}" data-prov="1" data-ck="${c.key||ckey(c)}" aria-expanded="false">${provLabel(t)}</button>`;
 }
+/* THE ORIGINAL QUESTION, WHERE THE PACK REWROTE ONE.
+
+   Some of these questions arrive from a Canvas capture with their context stripped:
+   Canvas kept the framing outside the question — a quiz title above it, a preamble, an
+   underline, a link — and the harvest took only the question. A pack may supply a
+   readable stem in its place and MUST hand the original over as `qOrig`.
+
+   Showing it is not politeness, it is the thing that keeps the rewrite honest. The card
+   claims to be the lecturer's; a reader has to be able to check what she actually
+   wrote, and to see that only the framing moved. Collapsed by default because the
+   original is usually the less useful of the two — but never more than one tap away,
+   and it is plain <details>, so it works with no JS and reads correctly to a screen
+   reader. A pack that rewrites nothing renders nothing. */
+function origHTML(c){
+  if(!c.qOrig) return '';
+  return `<details class="qorig"><summary>Show it as it appeared in Canvas</summary><div class="qo">${c.qOrig}</div>
+    <div class="qon">Only the wording of the question was changed, to say what it is asking now that Canvas's own framing is gone. The answer, the options and any passage are exactly as ${esc(PACK.lecturer||'the lecturer')} set them.</div></details>`;
+}
 function provDetailHTML(c){
   const t=provOf(c); if(!t) return '';
   const evs=Array.isArray(c.ev)?c.ev:(c.ev?[c.ev]:[]);
@@ -1259,17 +1304,36 @@ function clozeFilled(c){
   (c.blanks||[]).forEach((b,i)=>{ h=h.split('[['+(i+1)+']]').join(`<b>${b.options[b.correct]}</b>`); });
   return h;
 }
+/* THE WHOLE CHOICE SET, not just the key.
+
+   This used to return `<b>options[correct]</b>` for an mcq and nothing else, so All
+   cards and Search showed the question and the right answer with the distractors
+   invisible. On hs2-test1 that is 111 of 255 cards rendered in a form nobody can
+   check: you cannot tell whether a key is right without seeing what it was chosen
+   over, and you cannot spot the two failure modes that actually occur in an imported
+   pack — a distractor that is also true, and a key pointing at the wrong index.
+
+   Three of this pack's imported keys have already turned out to be wrong, every one
+   caught by a human reading the card. Hiding the options is hiding the evidence. The
+   same applied to a match card's distractors and a cloze blank's options. */
+const optLine=(txt,ok)=>`<div class="optl${ok?' ok':''}"><span class="mk">${ok?'✓':'·'}</span><span>${txt}</span></div>`;
 function answerHTML(c){
   switch(c.type){
     case 'flash': return c.a||'';
-    case 'mcq':   return `<b>${c.options[c.correct]}</b>`;
+    case 'mcq':   return (c.options||[]).map((o,i)=>optLine(o,i===c.correct)).join('');
     /* The completed passage, not a numbered list of the blanks. A cloze card's
        answer IS the sentence read through with the gaps filled — checking one
-       against the slides means reading it as prose. */
-    case 'cloze': return clozeFilled(c);
+       against the slides means reading it as prose. The per-blank choices follow it,
+       because a blank whose distractors are all also correct is a broken blank and
+       the filled sentence alone will never show you that. */
+    case 'cloze': return clozeFilled(c)
+      + (c.blanks||[]).map((b,i)=>`<div class="optset"><span class="bn">${i+1}</span>${
+          (b.options||[]).map((o,j)=>`<span class="opt${j===b.correct?' ok':''}">${strip(o)}</span>`).join('')}</div>`).join('');
     case 'order': return c.steps.map((s,i)=>`${i+1}. ${strip(s)}`).join('<br/>');
     case 'tfset': return c.statements.map(s=>`<b>${s.v?'TRUE':'FALSE'}</b> — ${strip(s.s)}`).join('<br/>');
-    case 'match': return c.pairs.map(p=>`${strip(p[0])} → <b>${strip(p[1])}</b>`).join('<br/>');
+    case 'match': return c.pairs.map(p=>`${strip(p[0])} → <b>${strip(p[1])}</b>`).join('<br/>')
+      + ((c.distractors||[]).length?`<div class="optset"><span class="bn">✗</span>${
+          c.distractors.map(d=>`<span class="opt">${strip(d)}</span>`).join('')}<span class="dl">decoys — match to nothing</span></div>`:'');
     default:      return (c.points||[]).map((p,i)=>`${i+1}. ${p}`).join('<br/>');   // saq
   }
 }
@@ -1447,7 +1511,7 @@ function libCardHTML(c){
       ${provHTML(c)}
       ${flagBtnHTML(c.key)}
     </div>
-    <div class="libq">${c.q}</div>
+    <div class="libq">${c.q}</div>${origHTML(c)}
     <div class="provslot"></div>
     ${c.type==='cloze'&&!showA?`<div class="liba">${esc(strip(c.text||''))}</div>`:''}
     ${figHTML(c)}
@@ -2115,7 +2179,7 @@ function renderStudy(){
       <div class="cmeta"><span class="tag acc">${topicName(c.topic)}</span>${
         c.type==='flash'?'':`<span class="tag">${tot} mark${tot>1?'s':''}</span>`}${
         provHTML(c)}<span class="cmend"><span class="tag right">${TYPELABEL[c.type]}</span>${flagBtnHTML(c.key)}</span></div>
-      <div class="q">${c.q}</div><div class="provslot"></div><div class="flagslot"></div>
+      <div class="q">${c.q}</div>${origHTML(c)}<div class="provslot"></div><div class="flagslot"></div>
       ${figHTML(c)}`;
   if(c.type==='flash')    studyFlash(G,head,c);
   else if(c.type==='saq') studyWritten(G,head,c);
