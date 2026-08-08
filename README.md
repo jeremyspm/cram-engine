@@ -258,7 +258,7 @@ machine-marked and written marks is computed from `auto`, `saq`, `mix` and each 
   through, filter within it. It ignores the background-reading pool for the same reason
   Search and the Brief do: this is the one view that must be able to say *everything*.
   Every card carries a **⚑ Flag** button, and so does the study card and the mock-test
-  review — see below.
+  review — see below. Three view modes, and **⚡ Rep these in Study** — see below.
 - **Extras** — dark/light theme, days-left pill, dismissible first-run panel,
   mobile-first (verified at 375px), Enter-key driving throughout.
 
@@ -281,6 +281,73 @@ because an authored `why` explains the reasoning and rarely restates the answer.
 This is a floor, not a substitute. A synthesised line is enormously better than a bare
 red box and clearly worse than a written one — **`why:` on every machine-marked card is
 still the highest-value authoring left in any pack.**
+
+## Three ways to look at a card, and 🎯 As tested
+
+All cards has a segmented switch on every group: **📖 Read** (question and answer
+together — the audit view), **🙈 Questions only**, and **🎯 As tested**.
+
+*As tested* draws each card **exactly as the queue deals it**: the real options as
+buttons, the real dropdowns in the real passage, the chain with its beads knocked out,
+the mark count, the source badge. It is answerable — a still picture of a multichoice
+card is not what being tested on it looks like — and **nothing you do in it is written
+to your progress**, which the view says on screen and which is the whole reason it can
+sit inside a browse list.
+
+The mechanism is the point: `cardHeadHTML(c)` and `faceHTML(c, runner, railItem)` are
+the functions **Study itself renders through**, called here with the same arguments.
+There is no second renderer to keep in step. A lookalike written to match would drift
+the first time either side moved and the drift would be invisible — both pages still
+look plausible, and the browse view quietly stops being evidence of what the reader
+will meet. `hs2-test1`'s build enforces it (**G14**): `libTestCardHTML` must call both
+functions, and there must be exactly one `faceHTML`.
+
+Damaged cards (`damaged:` — never dealt) have no *as tested* form, because inventing
+one would show the reader a version of the card they will never meet. They keep their
+head, their reason, and their answer.
+
+## 🔎 Rep only… — narrowing the queue
+
+Five dimensions, ANDed across and ORed within: **topic · question type · where the card
+came from · focus point · how you are doing on it** (never attempted / getting wrong /
+due for review / getting right / ⚑ flagged). So "the multichoice questions on the heart
+that I keep getting wrong" is one queue, and so is "just the written answers".
+
+They are the same five facts All cards already groups by — which is the tell that they
+were the right five: the reader could already *see* the pack cut those ways and could
+not then study any of the slices. **⚡ Rep these in Study**, on every group in All cards,
+is that connection made literal — it turns whatever you are looking at into the filter
+that produces it, replacing the whole scope rather than adding to it.
+
+Everything lives in `S.filters = {topics, types, tiers, crits, status}` — all arrays,
+empty meaning "no constraint". It replaced `S.topic` (one topic, honoured under one
+door) and `S.crit` (one focus point, set by the Brief), which were two filters with two
+shapes and two clear buttons that could not be combined; both migrate in on load, and
+`S.topic` only migrates when it was actually in effect, or a stale chip would silently
+narrow a queue that had been showing everything.
+
+Rules any change here has to keep:
+
+- **It applies under both doors**, like the background switch. It is a property of the
+  pool, not of who chooses the order.
+- **It announces itself.** Every active filter is a pill under the doors with its own
+  ✕, plus a clear-all. Every control is *delegated* — these are the only route out of a
+  narrowed queue, and a `setTimeout` binding a fast tab switch can beat would make it a
+  lock. We do not lock.
+- **It narrows the queue, not the pack.** Progress, the Brief, Search, All cards and the
+  hub's ⚡ study bus all keep counting the whole thing.
+- **Every count is honest.** Panel chips count *intersectionally* (`passFilters(c, skip)`
+  leaves that one dimension out), so the number on a chip is what you actually get.
+  `hs2-test1`'s build proves it (**G13**): every option in every dimension must deal
+  exactly the count it advertises. It was written because they had already drifted —
+  the panel counted "No source recorded" with `provOf`, the queue matched `c.tier` raw,
+  and the chip promised 46 cards and dealt none.
+- **The door note stops saying "all"** when a filter is on. "All 344 cards are in the
+  rotation, nothing is held back" is a sentence about an unfiltered deck; printed above
+  four active filters, every word of it is individually true and the claim is false.
+
+Deep links: `?topic=<id>` and `?type=mcq,match` set the scope (replacing that dimension,
+so a link means the same thing every time it is opened).
 
 ## Flagging a bad card
 
