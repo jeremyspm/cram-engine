@@ -2144,24 +2144,48 @@ $('#navMore').onclick=()=>showMore($('#nav2').classList.contains('hidden'));
    without anybody writing copy. */
 function renderOnboard(){
   const slot=$('#onboard'); if(!slot) return;
-  if(S.onboarded||!HASBRIEF()){ slot.innerHTML=''; return; }
+  /* Gated on having CRITERIA, not on having a Brief. It used to be the latter, which
+     meant a pack without one lost the exam date, the pass mark and the first-run
+     orientation as well — punishing the reader for a property of the pack. */
+  if(S.onboarded||!PACK.criteria||!PACK.criteria.length){ slot.innerHTML=''; return; }
   const cfg=Object.assign({auto:0,saq:0,minutes:0,pass:80},PACK.exam||{});
   const nQ=(cfg.auto||0)+(cfg.saq||0), d=examDate(), dl=daysLeft();
+  /* COMPLETENESS IS A CLAIM, AND THE PACK HAS TO EARN IT — the engine cannot.
+     This line used to read "There are N focus points the course says the test can ask
+     you about. This tool has every one of them", with N counted from the pack's OWN
+     criteria list. That is a tautology rendered as a guarantee, and on a narrow pack it
+     lies: the Module 1 Terminology tool covered 3 of the course's 36 focus points and
+     printed "There are 3 focus points … This tool has every one of them." True about
+     itself, badly false about the paper. Only a pack that names the blueprint it is
+     measured against may claim to cover it — PACK.blueprint.total. Anything else states
+     its scope and makes no claim at all, so the failure mode of forgetting the field is
+     an understated tool rather than an overstated one. */
+  const bp=PACK.blueprint||null, nC=PACK.criteria.length,
+        fp=n=>`${n} focus point${n===1?'':'s'}`;
+  const cover=bp&&bp.total>nC
+      ?`<p>This tool covers <b>${fp(nC)}</b> of the <b>${bp.total}</b> the course lists for this paper — one slice of the test, not the whole of it.</p>`
+    :bp&&bp.total===nC
+      ?`<p>There are <b>${fp(nC)}</b> the course says the test can ask you about. This tool has every one of them.</p>`
+      :`<p>This tool drills <b>${fp(nC)}</b> from the course's assessment criteria.</p>`;
   const when=d?d.toLocaleDateString('en-NZ',{day:'numeric',month:'long'}):null;
   const facts=[cfg.minutes?`${cfg.minutes} minutes`:null,nQ?`${nQ} questions`:null,when?`on ${when}`:null].filter(Boolean).join(', ');
   slot.innerHTML=`<div class="onb">
     <h3>${esc(PACK.title)}</h3>
     <p>${facts?esc(facts.charAt(0).toUpperCase()+facts.slice(1))+'. ':''}${PASSTARGET()?passCaveat():`You need <b>${cfg.pass}%</b> to pass.`}</p>
-    <p>There are <b>${(PACK.criteria||[]).length} focus points</b> the course says the test can ask you about. This tool has every one of them.</p>
+    ${cover}
     <!-- This used to read "Start by reading the Brief. Then drill." — which stopped being
          true the moment ⚡ HELP ME CRAM became the loudest control on the same screen.
          A first-run panel that recommends one thing while the page shouts another is
          worse than no panel: the reader has to guess which one the tool means. Both are
          named, in the order they should be used, and the cram set is described by what
-         it costs, because "12 cards" is the fact that makes it possible to start. -->
-    <p><b>Two ways in.</b> <b>Read the Brief</b> if the lecture has gone fuzzy — it explains
-      each focus point in plain prose. <b>⚡ Help me cram</b> if you would rather just start:
-      ${SESSION_N()} cards, and it stops.</p>
+         it costs, because "12 cards" is the fact that makes it possible to start.
+         The Brief half is dropped entirely when there is no Brief — naming a door that
+         is not there is how a reader ends up on an empty tab deciding the tool is broken. -->
+    ${HASBRIEF()
+      ?`<p><b>Two ways in.</b> <b>Read the Brief</b> if the lecture has gone fuzzy — it explains
+         each focus point in plain prose. <b>⚡ Help me cram</b> if you would rather just start:
+         ${SESSION_N()} cards, and it stops.</p>`
+      :`<p><b>⚡ Help me cram</b> is the way in: ${SESSION_N()} cards, and it stops.</p>`}
     <button class="btn primary" id="onbGo">Got it${dl!=null&&dl>0?` — ${dl} day${dl===1?'':'s'} to go`:''}</button>
   </div>`;
   $('#onbGo').onclick=()=>{ S.onboarded=true; save(); slot.innerHTML=''; };
@@ -2600,7 +2624,20 @@ function gate(cb,types,readyNote){
    It is DERIVED, not authored. The teaching material is already in the pack:
    flash answers written in teaching order underneath named criteria. This
    view simply renders them as prose instead of as questions.            */
-const HASBRIEF=()=>!!(PACK.criteria&&PACK.criteria.length);
+/* A LIST OF CRITERIA IS NOT A BRIEF. This view is derived from flash/saq cards (see
+   critProse below), so a pack made of nothing but machine-marked cards declares its
+   criteria, renders one empty stub per criterion, and `nav()` at the bottom of this
+   file sends every cold reader straight to them. That shipped: the Module 1 Terminology
+   tool — 63 multichoice cards, no flash, no saq — opened on a tab reading "No written
+   summary for this one yet" three times over, directly under an onboarding panel
+   telling the reader to start by reading it. The tab is earned by having prose to put
+   in it, not by having headings to put it under. */
+let _hasbrief=null;
+const HASBRIEF=()=>{
+  if(_hasbrief===null) _hasbrief=!!(PACK.criteria&&PACK.criteria.length)
+    &&PACK.criteria.some(c=>critProse(c.id).length);
+  return _hasbrief;
+};
 S.read=S.read||{};                 // critId -> timestamp. Additive: no migration needed.
 /* cardKey -> {g,t}: marking points you ticked, out of the total. The SRS box alone
    cannot carry this — it records how WELL you recalled something, not how many marks
