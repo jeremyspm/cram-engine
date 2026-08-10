@@ -2153,7 +2153,15 @@ function renderOnboard(){
     <h3>${esc(PACK.title)}</h3>
     <p>${facts?esc(facts.charAt(0).toUpperCase()+facts.slice(1))+'. ':''}${PASSTARGET()?passCaveat():`You need <b>${cfg.pass}%</b> to pass.`}</p>
     <p>There are <b>${(PACK.criteria||[]).length} focus points</b> the course says the test can ask you about. This tool has every one of them.</p>
-    <p><b>Start by reading the Brief.</b> Then drill. That is the whole method.</p>
+    <!-- This used to read "Start by reading the Brief. Then drill." — which stopped being
+         true the moment ⚡ HELP ME CRAM became the loudest control on the same screen.
+         A first-run panel that recommends one thing while the page shouts another is
+         worse than no panel: the reader has to guess which one the tool means. Both are
+         named, in the order they should be used, and the cram set is described by what
+         it costs, because "12 cards" is the fact that makes it possible to start. -->
+    <p><b>Two ways in.</b> <b>Read the Brief</b> if the lecture has gone fuzzy — it explains
+      each focus point in plain prose. <b>⚡ Help me cram</b> if you would rather just start:
+      ${SESSION_N()} cards, and it stops.</p>
     <button class="btn primary" id="onbGo">Got it${dl!=null&&dl>0?` — ${dl} day${dl===1?'':'s'} to go`:''}</button>
   </div>`;
   $('#onbGo').onclick=()=>{ S.onboarded=true; save(); slot.innerHTML=''; };
@@ -3239,9 +3247,14 @@ function sessState(){
   if(s.d!==today()){ s.d=today(); s.n=0; s.goal=0; save(); }
   return s;
 }
+/* A set is never longer than the pool it is drawn from. Without this, a small pack — or
+   a reader who has narrowed the queue to eleven cards — is promised twelve, and the deck
+   silently rebuilds and starts repeating cards to make the number up. Promising more
+   distinct cards than exist is the one lie this view cannot afford, since the number IS
+   the feature. */
 function sessStart(more){
   const s=sessState();
-  s.goal=(s.goal&&more?s.goal:s.n)+SESSION_N();
+  s.goal=(s.goal&&more?s.goal:s.n)+Math.min(SESSION_N(),Math.max(1,deckSource(ALLTYPES).length));
   save();
 }
 const sessLive=()=>{ const s=sessState(); return s.goal>s.n; };
@@ -3256,7 +3269,16 @@ function cramCTA(){
 }
 function wireCramCTA(){
   const b=$('#goCram'); if(!b||!b.addEventListener) return;
-  b.onclick=()=>{ if(!sessLive()) sessStart(false); nav('cram'); window.scrollTo({top:0}); };
+  b.onclick=()=>{
+    /* Retire the first-run panel on the way in. It sits above the view and is six lines
+       tall, so on a 390px phone the card a reader just asked for starts below the fold —
+       they tap the big button and land on the thing they tapped, pushed off screen.
+       ACTING on the panel's own suggestion is a stronger "got it" than tapping Got it,
+       and every fact in it is still reachable from Progress and Sources. */
+    if(!S.onboarded){ S.onboarded=true; save(); renderOnboard(); }
+    if(!sessLive()) sessStart(false);
+    nav('cram'); window.scrollTo({top:0});
+  };
 }
 function pipsHTML(done,goal){
   let h='';
@@ -3289,15 +3311,19 @@ function cramDeal(){
 }
 function renderCram(){
   const s=sessState();
+  /* The empty check comes BEFORE the finished check. A reader who has narrowed the queue
+     to nothing has a goal of n and would otherwise be congratulated on finishing a set
+     that was never dealt — "Done — 0 cards", with no hint that a filter did it. */
+  if(!deckSource(ALLTYPES).length){
+    view.innerHTML=`<div class="empty">${filtOn()
+      ? `Nothing matches the filters you have on. <button class="btn ghost" data-fx="clear" style="margin-left:6px">Clear them</button>`
+      : 'No cards in this pack yet.'}</div>`;
+    return;
+  }
   if(!s.goal){ sessStart(false); }
   if(s.n>=s.goal) return cramFinished();
   CUR=cramDeal();
-  if(!CUR){
-    view.innerHTML=`<div class="empty">${filtOn()
-      ? `Nothing matches the filters you have on. <button class="btn ghost" data-fx="clear" style="margin-left:6px">Clear them</button>`
-      : 'No cards here yet.'}</div>`;
-    return;
-  }
+  if(!CUR){ view.innerHTML=`<div class="empty">No cards here yet.</div>`; return; }
   const c=CUR, bar=sessBar(), head=cardHeadHTML(c), plan=typedPlan(c);
   if(plan)                 cramTyped(bar,head,c,plan);
   else if(c.type==='rail') studyRail(bar,head,c);
@@ -3306,8 +3332,16 @@ function renderCram(){
   else                     studyAuto(bar,head,c,cardMarks(c));
   wireSessBar();
 }
+/* "leave" goes to the BRIEF, not to Study. Study is the unbounded queue with the whole
+   card count printed across the top of it — the exact screen a bounded session exists to
+   keep a nervous reader away from — so exiting into it undoes the point at the one moment
+   the reader has already decided they have had enough. The Brief is calm, and it carries
+   the CARRY ON CRAMMING button at the top, so the way back is the first thing on it. */
 function wireSessBar(){
-  setTimeout(()=>{ const b=$('#sessOut'); if(b&&b.addEventListener) b.onclick=()=>nav('study'); },0);
+  setTimeout(()=>{
+    const b=$('#sessOut');
+    if(b&&b.addEventListener) b.onclick=()=>nav(HASBRIEF()?'brief':'study');
+  },0);
 }
 /* The end of a set. It has to do two things at once: stop, and not imply that stopping
    means finished. Both are said plainly — the tally is what happened, the line under it
@@ -3317,12 +3351,15 @@ function wireSessBar(){
 function cramFinished(){
   const s=sessState(), dl=(typeof daysLeft==='function')?daysLeft():null;
   const n=SESSION_N();
+  /* A zero tile is a worse report than no tile: a reader whose set happened to contain no
+     typeable card reads "0 terms typed" as a thing they failed to do. */
+  const typedN=Object.keys(S.typed).length;
   view.innerHTML=`<div class="sessdone">
     <h3>Done — ${s.n} card${s.n===1?'':'s'}.</h3>
     <p>That is the set. ${dl!=null&&dl>0?`<b>${dl} day${dl===1?'':'s'}</b> until the test — one set a day from here is ${n*dl} more reps.`:''}</p>
     <div class="tally">
       <div><b>${s.n}</b><span>today</span></div>
-      <div><b>${Object.keys(S.typed).length}</b><span>terms typed</span></div>
+      ${typedN?`<div><b>${typedN}</b><span>terms typed</span></div>`:''}
     </div>
     <p style="margin-top:16px">The rest of the pack has not gone anywhere — <b>Study</b>
       deals from it without a limit, and <b>All cards</b> shows every one of them.</p>
@@ -3352,11 +3389,22 @@ function cramTyped(bar,head,c,plan){
   const multi=plan.slots.length>1;
   const fields=plan.slots.map((s,i)=>`<div>${multi?`<label>Blank ${i+1}</label>`:''}
       <input class="tin" id="tin${i}" autocomplete="off" autocapitalize="off" autocorrect="off"
-        spellcheck="false" placeholder="${multi?'…':'Type the answer'}"/></div>`).join('');
+        spellcheck="false" enterkeyhint="go" aria-label="${multi?`Blank ${i+1}`:'Your answer'}"
+        placeholder="${multi?'…':'Type the answer'}"/></div>`).join('');
+  /* THE FIRST ONE OF THESE A READER EVER MEETS needs a different sentence. Typed recall
+     is the only place in the tool that asks you to produce something with nothing on
+     screen to lean on, and a cold reader's honest reaction to a blank box is that they
+     are about to be caught out. The thing that defuses it is not encouragement, it is
+     the mechanic: you cannot get stuck, because a miss hands you the multichoice. Said
+     once, on the first card, and never again — `S.typed` empty is the test, so no new
+     state and no flag to reset. */
+  const firstEver=!Object.keys(S.typed).length;
   view.innerHTML=bar+`<div class="card">${head}
     ${plan.kind==='cloze'&&c.text?`<div class="txt" style="margin-top:6px">${clozeStemHTML(c)}</div>`:''}
     <div class="tblanks" id="tblanks">${fields}</div>
-    <div class="tinhint">Type it from memory — spelling is marked kindly. No options yet.</div>
+    <div class="tinhint">${firstEver
+      ? `Type it from memory — nothing is on screen to pick from, which is the point. Spelling is marked kindly, and if you miss it the multichoice version comes straight up, so you cannot get stuck.`
+      : `Type it from memory — spelling is marked kindly. No options yet.`}</div>
     <div id="tfb"></div>
     <div class="btnrow">
       <button class="btn primary" id="tcheck">Check ↵</button>

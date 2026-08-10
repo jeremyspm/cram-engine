@@ -592,10 +592,15 @@ reader had already seen.
 
 `S.mcq` still means "marks scored on this card", so the Progress projection is
 untouched: a typed hit records the card's full marks through the same path a correct
-tap would. Typed attempts are logged separately in `S.typed`, and **⚑ "I think I was
-right — count it"** overrides land in `S.ovr` (capped at 200). Read that log: a term
-overridden repeatedly is a bad key, which is how three wrong answer keys were caught
-in this pack by hand.
+tap would. Typed attempts are logged separately in `S.typed`, and **"I think I was
+right — count it"** overrides land in `S.ovr` (capped at 200).
+
+That override log is worth mining — a term overridden repeatedly is a bad answer key,
+and three wrong keys have already been caught in this pack by hand — but **it has no
+screen yet.** It rides in the same saved blob as progress and flags, so it syncs; read
+it with `JSON.parse(localStorage['<PACK.id>']).ovr`. Surfacing it beside
+**All cards → ⚑ Flagged**, which already has the export it wants, is the obvious next
+step and is not built.
 
 ## How cards are chosen — the deck
 
