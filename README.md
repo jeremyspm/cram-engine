@@ -227,6 +227,17 @@ machine-marked and written marks is computed from `auto`, `saq`, `mix` and each 
 `cardMarks()`. On `hs2-test1` that lands on 19.5% written, against the paper's stated
 20% — so if your projection looks wrong, check the mix before the maths.
 
+### Optional: session size
+
+```js
+session: { n: 12, typedEvery: 3 },   // both optional; these are the defaults
+```
+
+`n` is how many cards one **⚡ HELP ME CRAM** set deals (minimum 4). `typedEvery` is how
+often the session pulls a typeable card forward — `3` aims for one in every three; `0`
+switches the reordering off and deals the deck's own order. Omit the whole block and
+every pack gets 12 and 3.
+
 ## What the shell provides
 
 - **Brief** — *the only view that explains rather than asks.* One section per focus
@@ -235,6 +246,9 @@ machine-marked and written marks is computed from `auto`, `saq`, `mix` and each 
   that one focus point (announced in a banner with a one-tap clear). A reader with no
   saved progress **lands here**, because opening in Study asks them to retrieve facts
   they have not encoded yet. Hidden entirely unless the pack declares `criteria`.
+- **Cram** — **Study with a fence around it.** Same deck, same ranking, cut off at a
+  finishable number (12 by default). See *The cram session* below. The **⚡ HELP ME
+  CRAM** button that starts one sits above the doors on both Study and the Brief.
 - **Study** — **one queue holding every card in the pack**, dealt from the deck below.
   Each card renders in its own form: a `flash` card flips and you grade yourself on the
   Leitner SRS (Again/Hard/Good/Easy); an `saq` reveals its marking points for you to
@@ -467,6 +481,121 @@ That is the property to preserve if you touch `clozeSegments`: it cannot drop,
 duplicate or reorder a word, and cannot orphan a `[[n]]` between two blocks. Any block
 that still holds too many blanks — the harvested slide dumps run 128 words with no full
 stop — is re-cut on blank boundaries, so no block is ever a wall.
+
+## The cram session — a set you can see the end of
+
+**⚡ HELP ME CRAM** deals **12 cards and then stops.** A pips row counts them down, and
+the view shows **no total, no due count and no doors** — the only numbers on it are
+*n of 12*.
+
+That restraint is the entire feature. What makes a 345-card pack frightening is not 345
+cards, it is an **unbounded queue with a debt number printed on it**: the count grows
+while you sleep, so opening the tool is a bill arriving. Shrinking the pack does not fix
+it — a 60-card pack with a growing due count produces the same dread. A set with a
+visible end does.
+
+A session is **not a second queue**. It is `buildDeck()`'s own deck — same cards, same
+ranking, the lecturer's questions and the never-practised focus points still first —
+read until the counter says stop. That is why this is ~150 lines and not a scheduler,
+and why nothing about Study changed.
+
+What the ending must never do is imply the set *is* the pack. It says so in as many
+words, offers **Another 12**, and quotes **no readiness percentage** — the mock test was
+removed from this engine for dressing a sample of already-seen cards as a prediction,
+and a session summary must not smuggle it back in.
+
+- `S.sess` holds `{d,n,goal}`, resets on a new local date, and survives a reload.
+- A card counts as done **whether or not it was answered correctly.** Counting only
+  correct answers turns a 12-card set into an unbounded one for exactly the reader who
+  most needs it to end.
+- `afterCard()` is the one indirection this needed: the four card runners are shared
+  with Study and used to call `renderStudy` by name, which threw a reader mid-session
+  back into the unbounded queue and lost the count.
+
+## Typed recall — produce it, then meet it as the paper asks it
+
+Where a card's answer is a short term, the session asks for it **typed, with no options
+on screen**, before showing any. Producing a term from memory is strictly harder than
+picking it out of four, and the harder thing is what predicts whether you still have it
+in a week.
+
+**Two stages, and the second is not a consolation prize.** Miss it — or tap *Show me the
+options* — and the **same card re-deals as the multichoice or dropdown it has always
+been**, which is the format the real paper uses. A miss converts into a rep of the
+examinable form instead of a dead end, and the lazy path (tap straight to the options
+every time) still trains the right thing. Nobody hits a wall.
+
+Three verdicts: **hit** · **near** (right idea, shown the correct spelling, credited) ·
+**miss** (falls through to the options). `near` is the load-bearing one — a reader marked
+wrong for a spelling they would have recognised instantly stops typing and starts
+tapping, and the mode is gone.
+
+### What the matcher does, and the two traps it exists to avoid
+
+Normalisation is **symmetric** — the typed text and the key go through the same pipeline
+— so the folds need only be *consistent*, not linguistically correct. `ae`→`e` mangles
+"aerobic" into "erobic" on both sides and still matches. Folded: case, punctuation,
+`the/a/an/of/and`, British↔American (`haemoglobin`/`hemoglobin`, `oedema`/`edema`,
+`-ise`/`-ize`), and plurals (`capillaries`→`capillary`, `veins`→`vein`, never
+`gas`→`ga`). A parenthetical gloss is accepted **either way round**, so
+`Left Anterior Descending artery {LAD}` takes `LAD` or the long form.
+
+Two traps, both found by running the matcher over the whole `hs2-test1` pack rather than
+by reasoning about it:
+
+1. **A distractor that is the key with a qualifier bolted on.** Containment credited
+   "Parasympathetic nervous system" because it *contains* "sympathetic nervous system";
+   likewise `Non-ciliated columnar epithelia` over `Ciliated…`, and `Glomerular` inside
+   `Juxta glomerular`. Six cards in the pack did this, and every one would have marked
+   the opposite of the right answer correct. **The distractor test now runs first:**
+   typing an option the card itself calls wrong is a miss, whatever the edit distance
+   says.
+2. **An over-eager stopword list.** Stripping `his` ate the proper noun in *Bundle of
+   His* and left the key as the bare word "bundle", contained in half the
+   conduction-system distractors. Articles and `of`/`and` are safe on anatomical terms;
+   pronouns and prepositions are not.
+
+**`node audit-typed.mjs ../your-pack/pack.js`** is the other end of that. It lifts the
+matcher out of `template.html` — never a copy, since a copy is what drifts — runs it over
+every typeable card, and exits non-zero on either finding:
+
+- **a key the matcher will not accept as its own answer** — a card that cannot be
+  answered correctly;
+- **a distractor that would be accepted** — which, now that the distractor test runs
+  first, means the two options are *indistinguishable after folding*: `Haemoglobin`
+  against `Hemoglobin`, `Tricuspid valve` against `The tricuspid valves`. A reader typing
+  one of those cannot be told they picked the wrong one, so the card is unfair typed
+  whatever the marker does. It doubles as the regression guard on trap 1 above.
+
+Run it after any pack change. `hs2-test1` is currently clean on both.
+
+### Which cards can be asked typed
+
+Conservatively chosen, because a card nobody can answer is blamed on the reader:
+
+- **`mcq`** whose answer is ≤3 words *and* whose stem stands alone. Stems written to be
+  read alongside their options — *which of the following…*, *…is NOT…* — are rejected,
+  as are True/False answers, since typing "true" is not recall.
+- **`cloze`**, all-or-nothing per card: every blank ≤3 words or the card deals as it
+  always did. A card that dealt half typed and half dropdown reads as a bug.
+
+On `hs2-test1` that is **69 of 344 dealable cards** (59 mcq + 10 cloze, 127 typed slots).
+
+**The session pulls typeable cards forward** (`typedEvery`, default 3), because ranking
+alone put **one** typeable card in the first twelve — `cardRank` leads with weak rails
+and flashcards, and neither can be typed. It **reorders, never filters**: nothing added,
+nothing dropped, every card still dealt once per pass. It mutates the shared deck
+deliberately; two decks would need two requeue paths and could disagree about what the
+reader had already seen.
+
+### What typing does *not* change
+
+`S.mcq` still means "marks scored on this card", so the Progress projection is
+untouched: a typed hit records the card's full marks through the same path a correct
+tap would. Typed attempts are logged separately in `S.typed`, and **⚑ "I think I was
+right — count it"** overrides land in `S.ovr` (capped at 200). Read that log: a term
+overridden repeatedly is a bad key, which is how three wrong answer keys were caught
+in this pack by hand.
 
 ## How cards are chosen — the deck
 
