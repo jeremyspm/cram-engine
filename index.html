@@ -3244,17 +3244,26 @@ const CRAM_TYPED_EVERY=()=>{ const v=(PACK.session||{}).typedEvery; return v===0
 const today=()=>new Date().toLocaleDateString('en-CA');   // YYYY-MM-DD, local
 function sessState(){
   const s=S.sess;
-  if(s.d!==today()){ s.d=today(); s.n=0; s.goal=0; save(); }
+  if(s.d!==today()){ s.d=today(); s.n=0; s.goal=0; s.base=0; save(); }
+  if(s.base==null) s.base=0;      // a blob saved before sets were counted from a baseline
   return s;
 }
 /* A set is never longer than the pool it is drawn from. Without this, a small pack — or
    a reader who has narrowed the queue to eleven cards — is promised twelve, and the deck
    silently rebuilds and starts repeating cards to make the number up. Promising more
    distinct cards than exist is the one lie this view cannot afford, since the number IS
-   the feature. */
-function sessStart(more){
+   the feature.
+
+   `base` is where the CURRENT set started, and it is what the bar counts from. Without
+   it the counter accumulated across the day: a reader who took a fourth set was looking
+   at "48 of 60" over sixty wrapped pips, which is a debt number over two rows — the
+   precise thing this view exists to keep off the screen. The day's total is still kept
+   (`n`) and still reported, but on the ending, where it reads as something done rather
+   than something owed. */
+function sessStart(){
   const s=sessState();
-  s.goal=(s.goal&&more?s.goal:s.n)+Math.min(SESSION_N(),Math.max(1,deckSource(ALLTYPES).length));
+  s.base=s.n;
+  s.goal=s.n+Math.min(SESSION_N(),Math.max(1,deckSource(ALLTYPES).length));
   save();
 }
 const sessLive=()=>{ const s=sessState(); return s.goal>s.n; };
@@ -3276,7 +3285,7 @@ function wireCramCTA(){
        ACTING on the panel's own suggestion is a stronger "got it" than tapping Got it,
        and every fact in it is still reachable from Progress and Sources. */
     if(!S.onboarded){ S.onboarded=true; save(); renderOnboard(); }
-    if(!sessLive()) sessStart(false);
+    if(!sessLive()) sessStart();
     nav('cram'); window.scrollTo({top:0});
   };
 }
@@ -3286,8 +3295,8 @@ function pipsHTML(done,goal){
   return `<div class="pips">${h}</div>`;
 }
 function sessBar(){
-  const s=sessState();
-  return `<div class="sessbar"><b>${s.n} of ${s.goal}</b>${pipsHTML(s.n,s.goal)}
+  const s=sessState(), done=s.n-s.base, total=s.goal-s.base;
+  return `<div class="sessbar"><b>${done} of ${total}</b>${pipsHTML(done,total)}
     <button class="sx" id="sessOut">leave</button></div>`;
 }
 /* Counting a card as done is the session's ONLY job beyond dealing it, and it is
@@ -3320,7 +3329,7 @@ function renderCram(){
       : 'No cards in this pack yet.'}</div>`;
     return;
   }
-  if(!s.goal){ sessStart(false); }
+  if(!s.goal){ sessStart(); }
   if(s.n>=s.goal) return cramFinished();
   CUR=cramDeal();
   if(!CUR){ view.innerHTML=`<div class="empty">No cards here yet.</div>`; return; }
@@ -3354,8 +3363,11 @@ function cramFinished(){
   /* A zero tile is a worse report than no tile: a reader whose set happened to contain no
      typeable card reads "0 terms typed" as a thing they failed to do. */
   const typedN=Object.keys(S.typed).length;
+  /* The heading counts the SET just finished; the tally counts the day. Both were `s.n`
+     before, so a second set announced "Done — 24 cards" for twelve cards of work. */
+  const set=Math.max(0,s.goal-s.base);
   view.innerHTML=`<div class="sessdone">
-    <h3>Done — ${s.n} card${s.n===1?'':'s'}.</h3>
+    <h3>Done — ${set} card${set===1?'':'s'}.</h3>
     <p>That is the set. ${dl!=null&&dl>0?`<b>${dl} day${dl===1?'':'s'}</b> until the test — one set a day from here is ${n*dl} more reps.`:''}</p>
     <div class="tally">
       <div><b>${s.n}</b><span>today</span></div>
@@ -3369,7 +3381,7 @@ function cramFinished(){
     </div></div>`;
   setTimeout(()=>{
     const m=$('#cramMore'), st=$('#cramStop');
-    if(m&&m.addEventListener) m.onclick=()=>{ sessStart(true); renderCram(); window.scrollTo({top:0}); };
+    if(m&&m.addEventListener) m.onclick=()=>{ sessStart(); renderCram(); window.scrollTo({top:0}); };
     if(st&&st.addEventListener) st.onclick=()=>nav('stats');
   },0);
 }
