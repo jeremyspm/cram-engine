@@ -2323,6 +2323,27 @@ $('#navMore').onclick=()=>showMore($('#nav2').classList.contains('hidden'));
    two unexplained doors. This is ten seconds of plain language and then it is gone
    for good. Every number in it is read off the pack, so a new cram tool inherits it
    without anybody writing copy. */
+/* THE WRITTEN SHARE, IN A WORD A READER ALREADY OWNS. "18.4%" is a number a student has
+   to do something with; "about a fifth" is a size they can feel. Derived from
+   paperWeights() every render and never typed as a literal (G31) — if a pack's exam
+   config changes, this sentence changes with it. An unsourced number that looks official
+   is the `pass: 65` failure, and a hardcoded one is the same bug with extra steps. */
+const SHAREWORDS=[[0.5,'about half'],[1/3,'about a third'],[0.25,'about a quarter'],
+  [0.2,'about a fifth'],[1/6,'about a sixth'],[0.125,'about an eighth'],[0.1,'about a tenth']];
+function shareWord(f){
+  return SHAREWORDS.reduce((b,c)=>Math.abs(c[0]-f)<Math.abs(b[0]-f)?c:b,SHAREWORDS[0])[1];
+}
+/* A DECLARED SHARE BEATS AN ESTIMATED ONE. paperWeights() derives the written share from
+   the MEAN MARKS of the cards in the pack, which is an estimate of the paper made from a
+   proxy for it — on hs2-test1 it lands at about a sixth, while the course's own
+   Assessment Overview publishes 20%. Estimating a number the course has already stated,
+   and then telling a student the estimate, is the same class of error as inventing one.
+   So a pack may declare `exam.saqShare` with a source, and the estimate is the fallback
+   for packs that cannot. Either way it is read, never typed. */
+const SAQSHARE=()=>{
+  const s=(PACK.exam||{}).saqShare;
+  return typeof s==='number'&&s>0&&s<1?s:paperWeights().saq;
+};
 function renderOnboard(){
   const slot=$('#onboard'); if(!slot) return;
   /* Gated on having CRITERIA, not on having a Brief. It used to be the latter, which
@@ -2350,6 +2371,39 @@ function renderOnboard(){
       :`<p>This tool drills <b>${fp(nC)}</b> from the course's assessment criteria.</p>`;
   const when=d?d.toLocaleDateString('en-NZ',{day:'numeric',month:'long'}):null;
   const facts=[cfg.minutes?`${cfg.minutes} minutes`:null,nQ?`${nQ} questions`:null,when?`on ${when}`:null].filter(Boolean).join(', ');
+  /* PLAIN ENGLISH, AND SHORT. The ringed panel used to open with a covering claim about
+     focus points, a duration, a pass caveat and then two dense paragraphs of house
+     vocabulary — "the queue opens on Round 1", "nothing else until every one is locked",
+     "one segment per focus point". Every sentence was true and the whole thing read like
+     release notes. A first-run panel is the one screen a reader has no reason to
+     persevere with, so it is now four short blocks, each with a bolded lead a reader can
+     skim, and it says WHY Round 1 is shaped the way it is rather than only what it does.
+     `focus point` never appears — the reader's word is topic. */
+  const wN=WRITTEN().length;
+  const share=cfg.saq?shareWord(SAQSHARE()):null;
+  const halves=cfg.auto&&cfg.saq
+    ? ` — ${cfg.auto} the computer marks and <b>${cfg.saq} you write out yourself</b>${
+        share?`. The written ones are worth ${share} of the marks`:''}`:'';
+  if(HASRINGS()){
+    slot.innerHTML=`<div class="onb">
+      <h3>${esc(PACK.title)}</h3>
+      <p><b>Your test.</b> ${[when,cfg.minutes?`${cfg.minutes} minutes`:null].filter(Boolean).join('. ')
+        }${nQ?`. ${nQ} questions${halves}`:''}.</p>
+      <p><b>${ROUNDLAB(0)} — one card from each of the ${nC} topics.</b> Every topic gets
+        one, even the small ones. A topic you have never answered a question on is a
+        guaranteed zero if it comes up, so this makes sure none of them is a blank.</p>
+      ${wN?`<p><b>${ROUNDLAB(R_WRITTEN)} — the ${wN===1?'case study':`${wN} case studies`}.</b>
+        Every written question comes from ${wN===1?'it':'them'}${share?`, so ${wN===1?'this one topic is':`these ${wN} topics are`} worth ${share} of the marks`:''}.</p>`:''}
+      <p><b>“Locked” means you got it right twice, an hour apart.</b> Once can be luck.
+        Twice, later, means it stuck. Get a card right and its stripe in the bar at the top
+        half-fills — come back in an hour, get it right again, and it fills up.</p>
+      <p class="ringsub">Tap the bar any time for the full list, or <b>?</b> for what these
+        words mean. ${PASSTARGET()?passCaveat():`You need <b>${cfg.pass}%</b> to pass.`}</p>
+      <button class="btn primary" id="onbGo">Got it${dl!=null&&dl>0?` — ${dl} day${dl===1?'':'s'} to go`:''}</button>
+    </div>`;
+    $('#onbGo').onclick=()=>{ S.onboarded=true; save(); slot.innerHTML=''; };
+    return;
+  }
   slot.innerHTML=`<div class="onb">
     <h3>${esc(PACK.title)}</h3>
     <p>${facts?esc(facts.charAt(0).toUpperCase()+facts.slice(1))+'. ':''}${PASSTARGET()?passCaveat():`You need <b>${cfg.pass}%</b> to pass.`}</p>
@@ -2362,23 +2416,9 @@ function renderOnboard(){
          it costs, because "12 cards" is the fact that makes it possible to start.
          The Brief half is dropped entirely when there is no Brief — naming a door that
          is not there is how a reader ends up on an empty tab deciding the tool is broken. -->
-    ${HASRINGS()
-      /* A RINGED PACK HAS ONE WAY IN, and the panel has to say the same thing the
-         screen behind it says. There is no Brief to send anyone to and no separate cram
-         button to choose between: the deck opens on Ring 0, which is one card per focus
-         point and stops when they are locked. Naming a door that is not there is how a
-         reader ends up on an empty tab deciding the tool is broken — and that is exactly
-         what this paragraph did for one build after the tabs changed. */
-      /* Named ROUND 1 rather than "the spine", and the bar it fills is named too. The
-         reader is about to dismiss this panel and the words have to survive it — which
-         is what the permanent ? and the line under the Spine Bar are for. */
-      ?`<p><b>One way in.</b> The queue opens on <b>${ROUNDLAB(0)}</b> — ${esc(RINGS[0].sub)},
-         and nothing else until every one is <b>locked</b>: answered right twice, in
-         sittings an hour or more apart. About ${Math.round(nC*0.7)} minutes if you know it.</p>
-       <p>The bar at the top is one segment per topic. Get one right and its segment
-         <b>half-fills</b>; get it right again an hour later and it fills. Tap the bar for
-         the full list, or <b>?</b> for what these words mean.</p>`
-      :HASBRIEF()
+    ${/* The ringed panel returned above — one implementation, not a branch here that can
+          drift away from it. What is left is the unringed pack's two doors. */
+      HASBRIEF()
       ?`<p><b>Two ways in.</b> <b>Read the Brief</b> if the lecture has gone fuzzy — it explains
          each focus point in plain prose. <b>⚡ Help me cram</b> if you would rather just start:
          ${SESSION_N()} cards, and it stops.</p>`
@@ -2517,6 +2557,29 @@ function systemBlocks(){
    sitting: a reader who answers a single question owns one lock record and is no longer
    "cold" by that test, so their second visit opened on the five-mark essay after all —
    the exact bounce this exists to prevent. */
+/* ROUND 1 WAS DEALT IN PUBLICATION ORDER, which is the order a lecturer numbered a Word
+   document in. It was inherited because it is the course's own — which makes the CLAIM
+   honest and says nothing about whether the SEQUENCE is useful. On hs2-test1 it put the
+   two focus points carrying 18.4% of the paper's marks at positions 37 and 38 of 38: the
+   highest-yield ground in the pack, dealt last, to the reader most likely to have quit,
+   and both of them written answers — the highest-friction card type in the engine.
+
+   So the declared written points are hoisted to the front of the round, immediately
+   behind the cold-start easy win. ORDERING ONLY, NEVER MEMBERSHIP — the same rule
+   coldOpen follows and G18 enforces, so the deck reviewed is still the deck dealt. A
+   pack that declares no `written` gets its deck back untouched. */
+/* PRIMARY SUBJECT ONLY, and this is the one place that differs from ring membership.
+   `onWritten` matches `alsoCrit` as well, which is right for deciding which round a card
+   belongs to — a card that tests case-study material belongs with the case studies. It
+   is wrong for deciding what to deal FIRST: two lymphatic spine cards merely mention the
+   vaccination case study, and matching on alsoCrit hoisted both of them ahead of the two
+   actual case-study lead cards. Hoist on what the card is ABOUT. */
+const primaryWritten=c=>wset().has(c.crit);
+function yieldOpen(deck){
+  if(!HASWRITTEN()) return deck;
+  const first=deck.filter(primaryWritten), rest=deck.filter(c=>!primaryWritten(c));
+  return first.length&&rest.length?first.concat(rest):deck;
+}
 const COLDN=3, COLDSTEM=160;
 function coldOpen(deck){
   if(answeredN()>=COLDN||deck.length<=COLDN) return deck;
@@ -2529,7 +2592,7 @@ function buildRingDeck(types,ring){
   const src=deckSource(types).filter(c=>ringOf(c)===ring&&!isLocked(c.key));
   if(ring===0){
     const order={}; (PACK.criteria||[]).forEach((c,i)=>order[c.id]=i);
-    return coldOpen(src.slice().sort((a,b)=>(order[a.crit]??99)-(order[b.crit]??99)));
+    return coldOpen(yieldOpen(src.slice().sort((a,b)=>(order[a.crit]??99)-(order[b.crit]??99))));
   }
   const by={};
   src.forEach(c=>(by[c.crit||'_']=by[c.crit||'_']||[]).push(c));
@@ -2621,16 +2684,64 @@ function buildDeck(types){
    two. Every string that reaches a screen goes through ROUNDLAB / `sub`.
    `${LECT}` rather than a pronoun — the engine is shared and does not know the
    lecturer's gender. */
+/* THE WRITTEN HALF IS ITS OWN ROUND, when the pack declares one.
+
+   A pack states `written: ['cs-bp','cs-vacc']` — the focus points the paper's written
+   questions are drawn from. It is DECLARED, never inferred from which cards happen to
+   be `type:'saq'`: on hs2-test1 three saq cards sit on ordinary focus points, and
+   sweeping those in would silently redefine the round as "anything with a written card"
+   while the copy still promised "the case studies the written questions come from".
+
+   Why it earns a round of its own. On hs2-test1 the written half is 18.4% of the paper's
+   marks (6 questions of 35, mean 4.24 marks each, against 1.0 for an MCQ) and every one
+   of them comes from those two focus points. Before this, their 21 non-spine cards sat
+   scattered through a 274-card round-robin with nothing marking them as the ground a
+   fifth of the paper is written on.
+
+   A pack that declares no `written` keeps the four rounds exactly as they were. */
+const WRITTEN=()=>(PACK.written||[]).filter(Boolean);
+const HASWRITTEN=()=>WRITTEN().length>0;
+let _wset=null;
+const wset=()=>_wset||(_wset=new Set(WRITTEN()));
+const onWritten=c=>[c.crit].concat(c.alsoCrit||[]).filter(Boolean).some(id=>wset().has(id));
 const RINGS=[
   {n:0,name:'the spine',      sub:'one card from every topic',
    blurb:'One card for every focus point the test can ask about.'},
+  ...(HASWRITTEN()?[{n:1,name:'the written half',sub:'the case studies the written questions come from',
+   blurb:'Every card on the case studies the paper draws its written questions from.'}]:[]),
   {n:1,name:'the thin points',sub:'the topics with barely any material',
    blurb:'Focus points with almost nothing behind them — every card here is load-bearing.'},
   {n:2,name:'the rest',       sub:`every other question ${LECT} has set`,
    blurb:`The rest of the questions ${LECT} has actually set.`},
   {n:3,name:'background',     sub:'background reading (optional)',
    blurb:`${LECTS} lecture notes and this pack’s own writing. Last, and skippable.`},
-];
+].map((r,i)=>Object.assign({},r,{n:i}));   // `n` is the POSITION, so the splice cannot desync it
+/* Named positions, so no call site carries a magic number that shifts when a pack
+   declares a written half. R_WRITTEN is -1 when there is none. */
+const R_SPINE=0;
+const R_WRITTEN=HASWRITTEN()?1:-1;
+const R_THIN=HASWRITTEN()?2:1;
+const R_REST=HASWRITTEN()?3:2;
+const R_BG=HASWRITTEN()?4:3;
+/* Where "Skip ahead" lands. Round 3's 274 cards were the worst destination available —
+   unbounded, no gauge of its own, and a permanent banner saying the spine is not locked.
+   The written half is bounded, winnable and worth a fifth of the paper; without one, the
+   thin points are the next-smallest real set. Read by ringNow() AND by the button's own
+   copy, so the two can never name different rounds (G29). */
+const ESCAPETO=HASWRITTEN()?R_WRITTEN:R_THIN;
+/* INSERTING A ROUND RENUMBERS EVERY ROUND BEHIND IT, and `S.ring` is a saved INDEX.
+   A reader who left off in "Round 2 — the thin points" (index 1) would come back to
+   index 1 now meaning the written half: not a crash, not visibly wrong, just silently
+   the wrong round — the same shape as the scope migration that had to be gated on
+   MIGRATED_SCOPE. Only a numeric ring above the spine needs moving; 0 is 0 in both
+   schemes and 'any' resolves through ESCAPETO at read time. Marked so it runs once.
+   Lives HERE, not with the other state defaults 1500 lines up, because it reads RINGS
+   and HASWRITTEN — `const` is in the temporal dead zone until this point and the whole
+   page would have thrown on load. */
+if(HASWRITTEN()&&S.ringsV!==2){
+  if(typeof S.ring==='number'&&S.ring>0) S.ring=Math.min(S.ring+1,RINGS.length-1);
+  S.ringsV=2; save();
+}
 const ROUNDLAB=n=>`Round ${n+1}`;
 const HASRINGS=()=>!!(PACK.spine&&Object.keys(PACK.spine).length&&(PACK.criteria||[]).length);
 const THINAT=6;                      // "fewer than six cards" — §4 of the rebuild spec
@@ -2653,10 +2764,15 @@ function ringOf(c){
      does not carry one, and `spineKeys().has(undefined)` is false for every card, which
      silently empties Ring 0 and spills all 38 spine cards into the rings behind it.
      Caught by G15 in build.mjs, which counts rings over PACK.cards directly. */
-  if(spineKeys().has(c.key||ckey(c))) return 0;
+  if(spineKeys().has(c.key||ckey(c))) return R_SPINE;
+  /* BEFORE the thin test on purpose. A card on a declared written point belongs to the
+     written half whatever else it touches — otherwise a case-study card that happens to
+     also mention a thin focus point is dealt as scarcity filler, and the round that
+     claims to hold "every card on the case studies" quietly does not. */
+  if(R_WRITTEN>=0&&onWritten(c)) return R_WRITTEN;
   const pp=perPoint();
-  if([c.crit].concat(c.alsoCrit||[]).filter(Boolean).some(id=>(pp[id]||0)<THINAT)) return 1;
-  return c.tier==='verbatim'?2:3;
+  if([c.crit].concat(c.alsoCrit||[]).filter(Boolean).some(id=>(pp[id]||0)<THINAT)) return R_THIN;
+  return c.tier==='verbatim'?R_REST:R_BG;
 }
 
 /* ---- the lock ---- */
@@ -2703,7 +2819,7 @@ function ringOpen(){
 }
 /* Which ring is actually being dealt. `S.ring` is the reader's choice and is honoured
    only as far as they have earned — except for `any`, the escape hatch: it drops
-   straight into ring 2 and the screen says out loud that the spine is not locked yet.
+   straight into ESCAPETO and the screen says out loud that the spine is not locked yet.
    ([[two-doors-pattern]] — a reduced pool must announce itself and must never be a
    hard lock.) */
 function ringNow(){
@@ -2715,7 +2831,7 @@ function ringNow(){
      question from the one asked. `point` deals the whole point, in the ordinary ranked
      order, and the bar says so and offers the way back. */
   if(S.ring==='point') return null;
-  if(S.ring==='any') return 2;
+  if(S.ring==='any') return ESCAPETO;
   const open=ringOpen();
   const want=typeof S.ring==='number'?S.ring:open;
   return Math.min(want,open);
@@ -2879,6 +2995,8 @@ const SPINEGLOSS=`<div class="spinehelp" id="spineHelp">
       <dt>Topic</dt><dd>One of the focus points the course says the test can ask about. One segment in the bar, in the order the course publishes them.</dd>
       <dt>Locked</dt><dd>You answered that topic's lead card right <b>twice</b>, in sittings an hour or more apart. Once is a half-height segment; the second one, an hour later, fills it.</dd>
       <dt>Round</dt><dd>Which pass through the deck you are on. ${RINGS.map((r,i)=>`<b>${ROUNDLAB(i)}</b> is ${esc(r.sub)}`).join('; ')}. A round opens when the one before it is fully locked — and you can always skip ahead.</dd>
+      <dt>Why this order</dt><dd><b>${ROUNDLAB(0)}</b> gives every topic one card, even the small ones, because a topic you have never answered on is a guaranteed zero if the test asks it — and the first question on a topic teaches you far more than the tenth.${
+        HASWRITTEN()?` <b>${ROUNDLAB(R_WRITTEN)}</b> is next because every written question comes from ${WRITTEN().length===1?'that case study':'those case studies'}, which is ${shareWord(SAQSHARE())} of the marks on ${WRITTEN().length} topic${WRITTEN().length===1?'':'s'}.`:''} After that it is ${LECTS} other questions, and background reading last.</dd>
     </dl>
     <button class="wlink" id="spineIntro">Show the opening explanation again →</button>
   </div>`;
@@ -3542,10 +3660,10 @@ function ringHeadHTML(){
   const skip=n===0&&!escaped&&answeredN()>=ESCAPEAFTER;
   if(!escaped&&!skip) return '';
   return `<div class="ringbar">
-      ${escaped?`<div class="ringwarn">You asked to skip ahead, so this is <b>${ROUNDLAB(2)}</b> — ${
+      ${escaped?`<div class="ringwarn">You asked to skip ahead, so this is <b>${ROUNDLAB(ESCAPETO)}</b> — ${
         ROUNDLAB(0)} is <b>not</b> locked yet. ${left0} topic${left0===1?'':'s'} still ${
         left0===1?'has a lead card':'have lead cards'} you have not locked. <button class="btn ghost" id="ringBack">Back to ${ROUNDLAB(0)}</button></div>`
-      :`<div class="ringsub2"><button class="btn ghost" id="ringAny">Skip ahead to ${ROUNDLAB(2)} →</button>
+      :`<div class="ringsub2"><button class="btn ghost" id="ringAny">Skip ahead to ${ROUNDLAB(ESCAPETO)} →</button>
          <span class="ringsub" style="display:block;margin-top:5px">${ROUNDLAB(0)} is not locked yet — you can come back to it any time.</span></div>`}
     </div>`;
 }
