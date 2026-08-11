@@ -711,6 +711,41 @@ away the more interesting half of the fact, so the survivor carries **both** `ev
 records (`ev` may be an array) and the reader now sees that the question has been set
 twice. That is the strongest signal a pack can carry.
 
+## Progress on two devices
+
+Progress lives in one localStorage blob, `cramengine.<PACK.id>`, and rides the hub's
+`Cloud.sync` when signed in. Two things make that safe, and both are load-bearing:
+
+**`mergeState(mine, theirs)`** is handed to `Cloud.sync` and is called whenever the two
+copies have diverged. The rule is **union, never arithmetic**: every card appears in the
+result, and where both sides hold a record for the same card the *more-advanced record
+wins whole* — never field-by-field, and counters are never added, because the two sides
+share a common ancestor and adding would double-count the history they both already
+have. Taking the further-along record can under-count a card drilled on both devices in
+the same window; that direction is the safe one for a mastery estimate, and it is the
+only one that cannot invent evidence. **View state stays local** — theme, filters, which
+door, which round, where you were in the browser all come from `mine`, because you should
+not sit down at your laptop and find its screen rearranged by what you tapped on a phone.
+
+**Adding a field to the state blob means adding it to `mergeState`.** A field that is not
+named there falls into the scalar sweep and takes the local device's value — right for a
+preference, wrong for anything holding a record per card, which would then quietly stop
+travelling between devices.
+
+The footer says which of the two the reader is actually in — signed in and syncing, or
+local-only — because a tool that is quietly saving to one device looks identical to one
+that is syncing, right up until the morning the other device is missing an evening.
+`renderStats` also offers back the copy this device replaced at the last sync, when the
+sync layer kept one (`Cloud.backup` / `Cloud.rollback`); it renders only when there is
+one to offer, and restoring merges rather than overwrites.
+
+`defaults(s)` holds the additive state defaults **as a function** because `load()` is
+called again at run time — by *Reset all progress* and by that restore button — and the
+copies at the top of the file are one-shot statements that only run at boot. Before it
+existed, resetting left `S.lock` undefined and the next answered card threw. `filters`
+and `ringsV` are deliberately *not* in it: each has a migration gated on being absent,
+and filling them in early silences the migration rather than satisfying it.
+
 ## For future Claude sessions
 
 When Jeremy says "new test on X, here are the notes": copy `template.html`, write a
