@@ -80,6 +80,7 @@ header{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap
 .dleft.now{background:var(--gMiss);border-color:var(--bMiss);color:var(--bad)}
 .iconbtn{width:38px;height:38px;border-radius:10px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--tx2);transition:.15s}
 .iconbtn:hover{border-color:var(--line2);color:var(--tx)}
+.iconbtn.on{border-color:var(--acc);color:var(--tx);background:var(--acc-soft)}
 .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
 .seg button{padding:7px 11px;border-radius:8px;font-size:12.5px;color:var(--tx2);font-weight:600;white-space:nowrap;transition:.12s}
 .seg button.on{background:var(--acc);color:#fff}
@@ -274,6 +275,32 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
 .onb p{margin:0 0 9px}
 .onb b{color:var(--tx)}
 .onb .btn{width:100%;margin-top:5px}
+/* ---- the route chooser ------------------------------------------------------
+   The one question the tool asks before it deals anything, asked once, and it is a
+   MODAL rather than a fifth panel above the queue. A decision rendered as furniture
+   gets scrolled past — which is exactly what happened to the two doors when the
+   rounds arrived: the tool quietly stopped asking and started deciding. Both options
+   close it, there is no third way out, and neither is permanent — the same two
+   buttons stay at the top of Study for good. */
+.rpwrap{position:fixed;inset:0;z-index:80;background:rgba(8,8,10,.62);
+  display:flex;align-items:center;justify-content:center;padding:12px;overflow:auto;
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.rp{background:var(--card);border:1px solid var(--line2);border-radius:16px;width:100%;max-width:520px;
+  padding:19px 17px 15px;box-shadow:0 22px 60px rgba(0,0,0,.45);max-height:calc(100vh - 24px);overflow:auto;
+  animation:pop .2s ease}
+.rp h3{margin:0 0 5px;font-size:19px;line-height:1.3}
+.rp .rpwhen{font-size:13px;color:var(--tx3);margin:0 0 14px;line-height:1.5}
+.rp .rpwhen b{color:var(--tx2)}
+.rpopt{display:block;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);
+  border-radius:13px;padding:13px 14px;margin-bottom:10px;transition:.14s}
+.rpopt:hover,.rpopt:focus-visible{border-color:var(--acc);background:var(--acc-soft)}
+.rpopt .rpt{display:flex;align-items:center;gap:8px;font-size:15.5px;font-weight:800;color:var(--tx);margin-bottom:5px}
+.rpopt .rptag{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+  padding:3px 7px;border-radius:5px;background:var(--acc);color:#fff;flex:0 0 auto}
+.rpopt .rpb{font-size:13px;line-height:1.55;color:var(--tx2)}
+.rpopt .rpb b{color:var(--tx)}
+.rp .rpfoot{font-size:12px;color:var(--tx3);line-height:1.5;margin:11px 0 0;padding-top:10px;border-top:1px solid var(--line)}
+.rp .rpfoot b{color:var(--tx2)}
 .brf{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:17px 17px 15px;margin-bottom:11px;scroll-margin-top:12px}
 .brf.lit{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
 .brf.read{border-color:var(--bGood)}
@@ -568,7 +595,14 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
    Stacked at phone width; two columns only when there is room for two. */
 .earned{display:grid;grid-template-columns:minmax(0,1fr);gap:9px;margin:11px 0 0;
   padding:11px 13px;border:1px solid var(--line2);border-radius:10px;background:var(--card2)}
-@media (min-width:520px){ .earned{grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:9px 18px} }
+/* TWO EQUAL HALVES, not `auto 1fr`. An `auto` maximum sizes that track towards its
+   max-content, and the widest note in LOCKDIAL is a 155-character sentence, so on any
+   screen wide enough for the two-column rule the first dial took the entire row and the
+   second collapsed to a 0px track — the topic name rendered one word per line down the
+   right edge, which is what the desktop page actually shipped. Two 1fr tracks cannot
+   do that whatever the notes say, and neither dial has content that wants more than
+   half. */
+@media (min-width:520px){ .earned{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px 18px} }
 .earned .dial{min-width:0}
 .earned .k{display:block;font-size:9.5px;font-weight:800;letter-spacing:.8px;
   text-transform:uppercase;color:var(--tx3);margin-bottom:3px}
@@ -689,6 +723,9 @@ h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--tx
   <div id="spineopen"></div>
   <div id="packwarn"></div>
   <div id="onboard"></div>
+  <!-- The route chooser, on top of everything. Empty except on the one render where
+       the reader has not yet said whether the tool picks or they do. -->
+  <div id="routepick"></div>
   <div class="controls">
     <!-- Three primary tabs is the whole tool: read it, practise it, sit it.
          Learn, Drill and Written used to be three of these, and the line between
@@ -1436,10 +1473,12 @@ function synthWhy(c,resp){
   }
   return '';
 }
-/* The way through to the prose. Only offered when the pack HAS a Brief and this card
-   names a focus point that is actually in it — a dead link would be worse than none. */
+/* The way through to the prose. Only offered when the reader can actually REACH the
+   Brief and this card names a focus point that is in it — a dead link would be worse
+   than none, and on a ringed pack, where the tab is retired, that is exactly what this
+   was: it shipped under every wrong answer and landed on a page with no way back. */
 function briefLink(c){
-  if(!HASBRIEF()||!c||!c.crit) return '';
+  if(!BRIEFOK()||!c||!c.crit) return '';
   const cr=(PACK.criteria||[]).find(x=>x.id===c.crit); if(!cr) return '';
   return `<button class="wlink" data-brief="${c.crit}">→ Read the full explanation: ${esc(cr.name||cr.id)}</button>`;
 }
@@ -2293,6 +2332,11 @@ const VIEWS={brief:renderBrief,cram:renderCram,study:renderStudy,cards:renderLib
 const VIEWALIAS={learn:'study',mcq:'study',saq:'study'};
 function nav(v){
   v=VIEWALIAS[v]||v;
+  /* The Brief is retired on a ringed pack, so nothing may land there — not a stale
+     bookmark, not a hub deep link (?mode=brief), not a button added later that forgets
+     to ask. Every caller that RENDERS an offer also checks BRIEFOK so the offer is not
+     drawn at all; this is the floor under those checks, not a substitute for them. */
+  if(v==='brief'&&!BRIEFOK()) v='study';
   VIEW=v;
   navBtns().forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   if(SECOND(v)) showMore(true);               // never leave the active tab hidden
@@ -2304,17 +2348,130 @@ function nav(v){
 navBtns().forEach(b=>b.onclick=()=>nav(b.dataset.v));
 $('#navMore').onclick=()=>showMore($('#nav2').classList.contains('hidden'));
 
+/* ════════════ VISIT COUNTER ════════════════════════════════════════════════════
+   Ported from hub/cloud/count.js rather than rewritten ([[porting-not-reimplementing]]).
+   It writes to the `pageviews` table of the hub's own Supabase — the same table, with a
+   different `site` value, which is exactly what that column is for. No third party, no
+   advertising network, no cookie, and the IP address is never sent or stored.
+
+   WHAT IS RECORDED: a site name, a path, a random per-browser id, a random per-tab id,
+   a coarse device bucket, language, timezone, and the referring HOST for traffic
+   arriving from off-site. That is enough for "how many people, how many views" and is
+   not enough to identify anybody. Reading it back requires signing in as the owner —
+   the row-level policy is insert-only for everyone else.
+
+   THE SHARED-ORIGIN DIVIDEND: this page and the hub are both on jeremyspm.github.io, so
+   they share localStorage. Reusing `hub.vid` means one person opening the hub and then
+   this tool is ONE visitor rather than two, and `hub.nocount` set anywhere on the origin
+   excludes this page too. Minting fresh keys here would have double-counted every real
+   reader and quietly broken the owner exclusion.
+
+   IT MUST NEVER BREAK THE PAGE IT COUNTS. Everything is wrapped, the fetch is
+   fire-and-forget, and a pack that declares no `analytics.site` sends nothing at all. */
+(function(){
+  try{
+    var A=(PACK.analytics||{}), CFG=A.url&&A.key?A:null;
+    if(!CFG||!A.site) return;
+    var host=location.hostname;
+    /* Never count development. Building this means reloading it dozens of times a day,
+       and every one would land in the stats as a visitor. */
+    if(!host||host==='localhost'||host==='127.0.0.1'||host==='[::1]'||
+       host.slice(-6)==='.local'||location.protocol==='file:') return;
+    /* ?nocount=1 marks this browser as the author's, for ever, on the whole origin.
+       ?nocount=0 undoes it. This is the "exclude me" switch and it has to be reachable
+       from a phone, which is why it is a URL and not a build flag. */
+    try{
+      var q=new URLSearchParams(location.search).get('nocount');
+      if(q==='1') localStorage.setItem('hub.nocount','1');
+      if(q==='0') localStorage.removeItem('hub.nocount');
+    }catch(e){}
+    /* Global Privacy Control is a legally recognised opt-out in some places, so it is
+       honoured. DNT deliberately is not: it is a signal about CROSS-SITE tracking, and
+       nothing here is a cross-site identifier. */
+    try{
+      if(navigator.globalPrivacyControl) return;
+      if(localStorage.getItem('hub.nocount')==='1') return;
+    }catch(e){}
+    function rid(){
+      try{ if(crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+      return 'r'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+    }
+    function keep(store,key){
+      try{ var v=store.getItem(key); if(!v){ v=rid(); store.setItem(key,v); } return v; }
+      catch(e){ return rid(); }        // private mode → counted as a new visitor
+    }
+    var w=window.innerWidth||1024;
+    var ref=null;
+    try{
+      if(document.referrer){
+        var h=new URL(document.referrer).hostname;
+        /* HOST only, and nothing for same-site navigation: an internal click is not
+           traffic arriving, and counting it would make every referrer number wrong. */
+        if(h&&h!==location.hostname) ref=h.replace(/^www\./,'').slice(0,80);
+      }
+    }catch(e){}
+    var body={
+      site:String(A.site).slice(0,40),
+      path:String(location.pathname||'/').slice(0,200),
+      ref:ref,
+      visitor:keep(localStorage,'hub.vid'),
+      session:keep(sessionStorage,'hub.sid'),
+      device:w<560?'phone':w<1024?'tablet':'desktop',
+      tz:null, lang:(navigator.language||'').slice(0,12)||null, user_id:null
+    };
+    try{ body.tz=Intl.DateTimeFormat().resolvedOptions().timeZone||null; }catch(e){}
+    fetch(CFG.url+'/rest/v1/pageviews',{
+      method:'POST', keepalive:true,
+      headers:{'apikey':CFG.key,'Authorization':'Bearer '+CFG.key,
+               'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(body)
+    }).catch(function(){});
+  }catch(e){}
+})();
+
 /* ---- first run --------------------------------------------------------------
    There was no onboarding at all: a cold reader met an error banner, eight tabs and
    two unexplained doors. This is ten seconds of plain language and then it is gone
    for good. Every number in it is read off the pack, so a new cram tool inherits it
    without anybody writing copy. */
+/* THE WRITTEN SHARE, IN A WORD A READER ALREADY OWNS. "18.4%" is a number a student has
+   to do something with; "about a fifth" is a size they can feel. Derived from
+   paperWeights() every render and never typed as a literal (G31) — if a pack's exam
+   config changes, this sentence changes with it. An unsourced number that looks official
+   is the `pass: 65` failure, and a hardcoded one is the same bug with extra steps. */
+const SHAREWORDS=[[0.5,'about half'],[1/3,'about a third'],[0.25,'about a quarter'],
+  [0.2,'about a fifth'],[1/6,'about a sixth'],[0.125,'about an eighth'],[0.1,'about a tenth']];
+function shareWord(f){
+  return SHAREWORDS.reduce((b,c)=>Math.abs(c[0]-f)<Math.abs(b[0]-f)?c:b,SHAREWORDS[0])[1];
+}
+/* A DECLARED SHARE BEATS AN ESTIMATED ONE. paperWeights() derives the written share from
+   the MEAN MARKS of the cards in the pack, which is an estimate of the paper made from a
+   proxy for it — on hs2-test1 it lands at about a sixth, while the course's own
+   Assessment Overview publishes 20%. Estimating a number the course has already stated,
+   and then telling a student the estimate, is the same class of error as inventing one.
+   So a pack may declare `exam.saqShare` with a source, and the estimate is the fallback
+   for packs that cannot. Either way it is read, never typed. */
+const SAQSHARE=()=>{
+  const s=(PACK.exam||{}).saqShare;
+  return typeof s==='number'&&s>0&&s<1?s:paperWeights().saq;
+};
+/* RETURNS WHAT IT WROTE, and that is not decoration: the build drives this against a
+   stub DOM whose innerHTML reads back as '' for every element, so "did the panel
+   render?" cannot be answered by looking at the page. The string it produced is an
+   observable the function actually owns. */
 function renderOnboard(){
-  const slot=$('#onboard'); if(!slot) return;
+  const slot=$('#onboard'); if(!slot) return '';
   /* Gated on having CRITERIA, not on having a Brief. It used to be the latter, which
      meant a pack without one lost the exam date, the pass mark and the first-run
      orientation as well — punishing the reader for a property of the pack. */
-  if(S.onboarded||!PACK.criteria||!PACK.criteria.length){ slot.innerHTML=''; return; }
+  /* THE CHOOSER GOES FIRST AND ALONE. Both of these are first-run surfaces, and
+     rendering the panel underneath the modal means the reader's first sight of the tool
+     is two explanations at once — one of them describing a route they have not agreed
+     to yet. The panel is not skipped, it is deferred: renderRoutePick calls back into
+     here the moment the choice is made, and by then the panel knows which half to
+     write. */
+  if(ROUTEASK()){ slot.innerHTML=''; return ''; }
+  if(S.onboarded||!PACK.criteria||!PACK.criteria.length){ slot.innerHTML=''; return ''; }
   const cfg=Object.assign({auto:0,saq:0,minutes:0,pass:80},PACK.exam||{});
   const nQ=(cfg.auto||0)+(cfg.saq||0), d=examDate(), dl=daysLeft();
   /* COMPLETENESS IS A CLAIM, AND THE PACK HAS TO EARN IT — the engine cannot.
@@ -2336,7 +2493,55 @@ function renderOnboard(){
       :`<p>This tool drills <b>${fp(nC)}</b> from the course's assessment criteria.</p>`;
   const when=d?d.toLocaleDateString('en-NZ',{day:'numeric',month:'long'}):null;
   const facts=[cfg.minutes?`${cfg.minutes} minutes`:null,nQ?`${nQ} questions`:null,when?`on ${when}`:null].filter(Boolean).join(', ');
-  slot.innerHTML=`<div class="onb">
+  /* PLAIN ENGLISH, AND SHORT. The ringed panel used to open with a covering claim about
+     focus points, a duration, a pass caveat and then two dense paragraphs of house
+     vocabulary — "the queue opens on Round 1", "nothing else until every one is locked",
+     "one segment per focus point". Every sentence was true and the whole thing read like
+     release notes. A first-run panel is the one screen a reader has no reason to
+     persevere with, so it is now four short blocks, each with a bolded lead a reader can
+     skim, and it says WHY Round 1 is shaped the way it is rather than only what it does.
+     `focus point` never appears — the reader's word is topic. */
+  const wN=WRITTEN().length;
+  const share=cfg.saq?shareWord(SAQSHARE()):null;
+  const halves=cfg.auto&&cfg.saq
+    ? ` — ${cfg.auto} the computer marks and <b>${cfg.saq} you write out yourself</b>${
+        share?`. The written ones are worth ${share} of the marks`:''}`:'';
+  if(HASRINGS()){
+    /* THE PANEL FOLLOWS THE ROUTE THE READER JUST CHOSE. One panel, one branch — not
+       two copies that drift — because the alternative shipped for a week in spirit:
+       a reader who wanted to pick their own topics was handed three paragraphs about
+       an order they had just declined. The test facts and the meaning of "locked" are
+       common to both; only the middle changes. */
+    const routed=GUIDED()
+      ?`<p><b>${ROUNDLAB(0)} — one card from each of the ${nC} topics.</b> Every topic gets
+        one, even the small ones. A topic you have never answered a question on is a
+        guaranteed zero if it comes up, so this makes sure none of them is a blank.</p>
+      ${wN?`<p><b>${ROUNDLAB(R_WRITTEN)} — the ${wN===1?'case study':`${wN} case studies`}.</b>
+        Every written question comes from ${wN===1?'it':'them'}${share?`, so ${wN===1?'this one topic is':`these ${wN} topics are`} worth ${share} of the marks`:''}.</p>`:''}`
+      :`<p><b>You are picking.</b> <b>🔎 Rep only…</b> above the card cuts the deck to a
+        topic, a question type, a single point on the course's list, or the ones you keep
+        getting wrong. Pick nothing and you get the whole pack, leading with the questions
+        ${LECT} has actually set.</p>
+      <p><b>🎯 Guided</b> sits next to it on every card screen. One tap and the rounds
+        take over${wN&&share?`, opening on one card from every topic and then the ${
+        wN===1?'case study':'case studies'} worth ${share} of the marks`:''}.</p>`;
+    const html=`<div class="onb">
+      <h3>${esc(PACK.title)}</h3>
+      <p><b>Your test.</b> ${[when,cfg.minutes?`${cfg.minutes} minutes`:null].filter(Boolean).join('. ')
+        }${nQ?`. ${nQ} questions${halves}`:''}.</p>
+      ${routed}
+      <p><b>“Locked” means you got it right twice, an hour apart.</b> Once can be luck.
+        Twice, later, means it stuck. Get a card right and its stripe in the bar at the top
+        half-fills — come back in an hour, get it right again, and it fills up.</p>
+      <p class="ringsub">Tap the bar any time for the full list, or <b>?</b> for what these
+        words mean. ${PASSTARGET()?passCaveat():`You need <b>${cfg.pass}%</b> to pass.`}</p>
+      <button class="btn primary" id="onbGo">Got it${dl!=null&&dl>0?` — ${dl} day${dl===1?'':'s'} to go`:''}</button>
+    </div>`;
+    slot.innerHTML=html;
+    $('#onbGo').onclick=()=>{ S.onboarded=true; save(); slot.innerHTML=''; };
+    return html;
+  }
+  const html=`<div class="onb">
     <h3>${esc(PACK.title)}</h3>
     <p>${facts?esc(facts.charAt(0).toUpperCase()+facts.slice(1))+'. ':''}${PASSTARGET()?passCaveat():`You need <b>${cfg.pass}%</b> to pass.`}</p>
     ${cover}
@@ -2348,30 +2553,94 @@ function renderOnboard(){
          it costs, because "12 cards" is the fact that makes it possible to start.
          The Brief half is dropped entirely when there is no Brief — naming a door that
          is not there is how a reader ends up on an empty tab deciding the tool is broken. -->
-    ${HASRINGS()
-      /* A RINGED PACK HAS ONE WAY IN, and the panel has to say the same thing the
-         screen behind it says. There is no Brief to send anyone to and no separate cram
-         button to choose between: the deck opens on Ring 0, which is one card per focus
-         point and stops when they are locked. Naming a door that is not there is how a
-         reader ends up on an empty tab deciding the tool is broken — and that is exactly
-         what this paragraph did for one build after the tabs changed. */
-      /* Named ROUND 1 rather than "the spine", and the bar it fills is named too. The
-         reader is about to dismiss this panel and the words have to survive it — which
-         is what the permanent ? and the line under the Spine Bar are for. */
-      ?`<p><b>One way in.</b> The queue opens on <b>${ROUNDLAB(0)}</b> — ${esc(RINGS[0].sub)},
-         and nothing else until every one is <b>locked</b>: answered right twice, in
-         sittings an hour or more apart. About ${Math.round(nC*0.7)} minutes if you know it.</p>
-       <p>The bar at the top is one segment per topic. Get one right and its segment
-         <b>half-fills</b>; get it right again an hour later and it fills. Tap the bar for
-         the full list, or <b>?</b> for what these words mean.</p>`
-      :HASBRIEF()
+    ${/* The ringed panel returned above — one implementation, not a branch here that can
+          drift away from it. What is left is the unringed pack's two doors. */
+      HASBRIEF()
       ?`<p><b>Two ways in.</b> <b>Read the Brief</b> if the lecture has gone fuzzy — it explains
          each focus point in plain prose. <b>⚡ Help me cram</b> if you would rather just start:
          ${SESSION_N()} cards, and it stops.</p>`
       :`<p><b>⚡ Help me cram</b> is the way in: ${SESSION_N()} cards, and it stops.</p>`}
     <button class="btn primary" id="onbGo">Got it${dl!=null&&dl>0?` — ${dl} day${dl===1?'':'s'} to go`:''}</button>
   </div>`;
+  slot.innerHTML=html;
   $('#onbGo').onclick=()=>{ S.onboarded=true; save(); slot.innerHTML=''; };
+  return html;
+}
+/* ════════════ THE ONE QUESTION THE TOOL ASKS ═══════════════════════════════════
+   A ringed pack used to open by telling the reader what was about to happen to them.
+   Every word of it was true, the order it described is a good order, and the reader
+   was never asked. The only ways off it were a filter panel that narrows the round you
+   are already in and a blueprint row three taps deep in Progress — so in practice the
+   tool had one route and a cold reader could not tell that was a decision anybody had
+   made.
+
+   So: one modal, once, two doors, and then it never appears again.
+
+   EVERY NUMBER IN IT IS READ OFF THE PACK. The guided door has to earn the word
+   "recommended", and the argument for it is arithmetic the pack already contains —
+   how many topics the course lists, how many of their lead cards are questions the
+   lecturer has actually set, and what share of the marks the written half carries.
+   Typed as literals those become the invented `pass: 65` all over again, so nothing
+   here is typed: no pack, no claim. A pack whose spine holds nothing sourced simply
+   loses that clause and the door still works.
+
+   IT IS NOT A GATE. Both buttons open the whole tool, neither can be undone-proof,
+   and the footer says so in the modal itself — the failure this replaces is a reader
+   who thought the route was the product. */
+function spineVerbatim(){
+  const keys=new Set(Object.values(PACK.spine||{}));
+  return allCards().filter(c=>keys.has(c.key)&&provOf(c)==='verbatim').length;
+}
+function routePickHTML(){
+  const cfg=Object.assign({minutes:0,auto:0,saq:0},PACK.exam||{});
+  const nQ=(cfg.auto||0)+(cfg.saq||0), d=examDate(), dl=daysLeft();
+  const when=d?d.toLocaleDateString('en-NZ',{weekday:'long',day:'numeric',month:'long'}):null;
+  const facts=[when,cfg.minutes?`${cfg.minutes} minutes`:null,nQ?`${nQ} questions`:null,
+               dl!=null&&dl>0?`<b>${dl} day${dl===1?'':'s'} away</b>`:null].filter(Boolean).join(' · ');
+  const nC=(PACK.criteria||[]).length, wN=WRITTEN().length;
+  const share=cfg.saq?shareWord(SAQSHARE()):null;
+  const nV=spineVerbatim();
+  /* A claim about the lead cards, made only at the strength the pack supports it.
+     Nothing sourced in the spine and the sentence disappears rather than softening
+     into something unfalsifiable. */
+  const evid=!nV?'':nV>=nC?`, every one of them a question ${LECT} has set before`
+                          :`, <b>${nV}</b> of them questions ${LECT} has set before`;
+  return `<div class="rpwrap" role="dialog" aria-modal="true" aria-labelledby="rpTitle">
+    <div class="rp">
+      <h3 id="rpTitle">${esc(PACK.title)}</h3>
+      <p class="rpwhen">${facts||'Two ways to work through this.'}</p>
+      <button class="rpopt" id="rpGuided" data-route="guided">
+        <span class="rpt">🎯 Guide me<span class="rptag">Recommended</span></span>
+        <span class="rpb">Work through it in the order this pack argues for: <b>one card from
+          each of the ${nC} topics</b> the course lists${evid} — because a topic you have
+          never answered a question on is a guaranteed zero if it comes up${
+          wN&&share?`. Then the ${wN===1?'case study':`${wN} case studies`} every written
+          question comes from, which is <b>${share} of the marks</b> sitting on ${
+          wN===1?'one topic':`${wN} topics`}`:''}.</span></button>
+      <button class="rpopt" id="rpOwn" data-route="own">
+        <span class="rpt">🗂 I'll choose</span>
+        <span class="rpb">Pick what you rep — a topic, a question type, one point off the
+          course's list, or <b>the ones you keep getting wrong</b>. Pick nothing and it
+          deals the whole pack, hardest and highest-value first.</span></button>
+      <p class="rpfoot"><b>Neither is a commitment.</b> Both buttons stay at the top of
+        every card screen, so you can swap over mid-session. Same cards either way, same
+        marking, and anything you lock stays locked.</p>
+    </div></div>`;
+}
+/* NO PER-BUTTON WIRING HERE AT ALL. Both options carry `data-route`, so they are
+   driven by the one delegated handler further down — the same one the permanent doors
+   use, which also clears this modal by calling back into here once a route exists.
+
+   This is the strongest case in the file for delegation. The modal is a full-screen
+   fixed overlay with no close button, so if its bindings were ever lost the reader
+   would be locked out of the entire tool rather than out of one control. A handler
+   that cannot come unbound is the only version of this that is safe to ship. */
+function renderRoutePick(){
+  const slot=$('#routepick'); if(!slot) return;
+  if(!ROUTEASK()){ slot.innerHTML=''; return; }
+  slot.innerHTML=routePickHTML();
+  const g=$('#rpGuided');
+  if(g&&typeof g.focus==='function') g.focus();
 }
 /* ============================ two doors ============================
    ONE dataset, two ways in. "Get me ready" lets the engine choose the
@@ -2503,6 +2772,29 @@ function systemBlocks(){
    sitting: a reader who answers a single question owns one lock record and is no longer
    "cold" by that test, so their second visit opened on the five-mark essay after all —
    the exact bounce this exists to prevent. */
+/* ROUND 1 WAS DEALT IN PUBLICATION ORDER, which is the order a lecturer numbered a Word
+   document in. It was inherited because it is the course's own — which makes the CLAIM
+   honest and says nothing about whether the SEQUENCE is useful. On hs2-test1 it put the
+   two focus points carrying 18.4% of the paper's marks at positions 37 and 38 of 38: the
+   highest-yield ground in the pack, dealt last, to the reader most likely to have quit,
+   and both of them written answers — the highest-friction card type in the engine.
+
+   So the declared written points are hoisted to the front of the round, immediately
+   behind the cold-start easy win. ORDERING ONLY, NEVER MEMBERSHIP — the same rule
+   coldOpen follows and G18 enforces, so the deck reviewed is still the deck dealt. A
+   pack that declares no `written` gets its deck back untouched. */
+/* PRIMARY SUBJECT ONLY, and this is the one place that differs from ring membership.
+   `onWritten` matches `alsoCrit` as well, which is right for deciding which round a card
+   belongs to — a card that tests case-study material belongs with the case studies. It
+   is wrong for deciding what to deal FIRST: two lymphatic spine cards merely mention the
+   vaccination case study, and matching on alsoCrit hoisted both of them ahead of the two
+   actual case-study lead cards. Hoist on what the card is ABOUT. */
+const primaryWritten=c=>wset().has(c.crit);
+function yieldOpen(deck){
+  if(!HASWRITTEN()) return deck;
+  const first=deck.filter(primaryWritten), rest=deck.filter(c=>!primaryWritten(c));
+  return first.length&&rest.length?first.concat(rest):deck;
+}
 const COLDN=3, COLDSTEM=160;
 function coldOpen(deck){
   if(answeredN()>=COLDN||deck.length<=COLDN) return deck;
@@ -2515,7 +2807,7 @@ function buildRingDeck(types,ring){
   const src=deckSource(types).filter(c=>ringOf(c)===ring&&!isLocked(c.key));
   if(ring===0){
     const order={}; (PACK.criteria||[]).forEach((c,i)=>order[c.id]=i);
-    return coldOpen(src.slice().sort((a,b)=>(order[a.crit]??99)-(order[b.crit]??99)));
+    return coldOpen(yieldOpen(src.slice().sort((a,b)=>(order[a.crit]??99)-(order[b.crit]??99))));
   }
   const by={};
   src.forEach(c=>(by[c.crit||'_']=by[c.crit||'_']||[]).push(c));
@@ -2607,18 +2899,106 @@ function buildDeck(types){
    two. Every string that reaches a screen goes through ROUNDLAB / `sub`.
    `${LECT}` rather than a pronoun — the engine is shared and does not know the
    lecturer's gender. */
+/* THE WRITTEN HALF IS ITS OWN ROUND, when the pack declares one.
+
+   A pack states `written: ['cs-bp','cs-vacc']` — the focus points the paper's written
+   questions are drawn from. It is DECLARED, never inferred from which cards happen to
+   be `type:'saq'`: on hs2-test1 three saq cards sit on ordinary focus points, and
+   sweeping those in would silently redefine the round as "anything with a written card"
+   while the copy still promised "the case studies the written questions come from".
+
+   Why it earns a round of its own. On hs2-test1 the written half is 18.4% of the paper's
+   marks (6 questions of 35, mean 4.24 marks each, against 1.0 for an MCQ) and every one
+   of them comes from those two focus points. Before this, their 21 non-spine cards sat
+   scattered through a 274-card round-robin with nothing marking them as the ground a
+   fifth of the paper is written on.
+
+   A pack that declares no `written` keeps the four rounds exactly as they were. */
+const WRITTEN=()=>(PACK.written||[]).filter(Boolean);
+const HASWRITTEN=()=>WRITTEN().length>0;
+let _wset=null;
+const wset=()=>_wset||(_wset=new Set(WRITTEN()));
+const onWritten=c=>[c.crit].concat(c.alsoCrit||[]).filter(Boolean).some(id=>wset().has(id));
 const RINGS=[
   {n:0,name:'the spine',      sub:'one card from every topic',
    blurb:'One card for every focus point the test can ask about.'},
+  ...(HASWRITTEN()?[{n:1,name:'the written half',sub:'the case studies the written questions come from',
+   blurb:'Every card on the case studies the paper draws its written questions from.'}]:[]),
   {n:1,name:'the thin points',sub:'the topics with barely any material',
    blurb:'Focus points with almost nothing behind them — every card here is load-bearing.'},
   {n:2,name:'the rest',       sub:`every other question ${LECT} has set`,
    blurb:`The rest of the questions ${LECT} has actually set.`},
   {n:3,name:'background',     sub:'background reading (optional)',
    blurb:`${LECTS} lecture notes and this pack’s own writing. Last, and skippable.`},
-];
+].map((r,i)=>Object.assign({},r,{n:i}));   // `n` is the POSITION, so the splice cannot desync it
+/* Named positions, so no call site carries a magic number that shifts when a pack
+   declares a written half. R_WRITTEN is -1 when there is none. */
+const R_SPINE=0;
+const R_WRITTEN=HASWRITTEN()?1:-1;
+const R_THIN=HASWRITTEN()?2:1;
+const R_REST=HASWRITTEN()?3:2;
+const R_BG=HASWRITTEN()?4:3;
+/* Where "Skip ahead" lands. Round 3's 274 cards were the worst destination available —
+   unbounded, no gauge of its own, and a permanent banner saying the spine is not locked.
+   The written half is bounded, winnable and worth a fifth of the paper; without one, the
+   thin points are the next-smallest real set. Read by ringNow() AND by the button's own
+   copy, so the two can never name different rounds (G29). */
+const ESCAPETO=HASWRITTEN()?R_WRITTEN:R_THIN;
+/* INSERTING A ROUND RENUMBERS EVERY ROUND BEHIND IT, and `S.ring` is a saved INDEX.
+   A reader who left off in "Round 2 — the thin points" (index 1) would come back to
+   index 1 now meaning the written half: not a crash, not visibly wrong, just silently
+   the wrong round — the same shape as the scope migration that had to be gated on
+   MIGRATED_SCOPE. Only a numeric ring above the spine needs moving; 0 is 0 in both
+   schemes and 'any' resolves through ESCAPETO at read time. Marked so it runs once.
+   Lives HERE, not with the other state defaults 1500 lines up, because it reads RINGS
+   and HASWRITTEN — `const` is in the temporal dead zone until this point and the whole
+   page would have thrown on load. */
+if(HASWRITTEN()&&S.ringsV!==2){
+  if(typeof S.ring==='number'&&S.ring>0) S.ring=Math.min(S.ring+1,RINGS.length-1);
+  S.ringsV=2; save();
+}
 const ROUNDLAB=n=>`Round ${n+1}`;
 const HASRINGS=()=>!!(PACK.spine&&Object.keys(PACK.spine).length&&(PACK.criteria||[]).length);
+/* ════════════ WHO CHOOSES — the route ══════════════════════════════════════════
+   The rounds are a good order and they were also the ONLY order. A ringed pack hid
+   the two doors ([[two-doors-pattern]]) on the argument that a ringed deck "has
+   already decided" — true of the ordering and false of the reader, who had decided
+   nothing and was given no way to say so. What was left was a filter panel labelled
+   "Rep only…" that narrows the round you are already in, and a blueprint row three
+   taps away in Progress. That is not a door, it is a keyhole.
+
+   So the choice is asked once, out loud, and then lives permanently at the top of
+   Study:
+
+     guided  the rounds, in the order the pack argues for. The default, and the
+             recommendation, because it is the only order that can promise coverage.
+     own     the reader picks — topic, question type, focus point, the ones they keep
+             getting wrong — and the deck falls back to the ordinary ranked queue.
+
+   ONE DATASET, ONE PROGRESS MODEL. `own` is not a second deck and not a second
+   scoring rule: the same cards, the same S.lock, the same Spine Bar, the same bounded
+   set of twelve. All it changes is which cards come next and in what order. A pack
+   with no rings never sees any of this — `GUIDED()` is true for it by construction,
+   which is exactly its old behaviour.
+
+   `S.route` is deliberately UNDEFINED until the reader answers, and that is the whole
+   trigger for the chooser: no separate "have they seen it" flag to fall out of sync
+   with the thing it claims to describe. */
+const GUIDED=()=>!HASRINGS()||S.route!=='own';
+/* THE QUESTION IS OUTSTANDING, asked as one predicate by both surfaces that care —
+   the chooser, which renders when it is true, and the first-run panel, which stays
+   silent while it is. Two hand-written copies of the same condition is how one of them
+   ends up rendering underneath the other. */
+const ROUTEASK=()=>HASRINGS()&&!S.route;
+function setRoute(r){
+  S.route=(r==='own')?'own':'guided';
+  /* Coming back to the rounds from a one-point drill has to undo the drill, or the
+     reader lands in "Round 1" narrowed to a single focus point and the round line and
+     the queue disagree about what is being dealt. Exactly what #ringBack already does,
+     because it is the same journey by a different button. */
+  if(GUIDED()&&S.ring==='point'){ if(S.filters.crits.length) S.filters=FILT0(); S.ring=ringOpen(); }
+  save();
+}
 const THINAT=6;                      // "fewer than six cards" — §4 of the rebuild spec
 /* Cards per focus point, counting alsoCrit: a point is thin when little TOUCHES it,
    not when little leads it. Computed once off the pack, which never changes at run
@@ -2639,10 +3019,15 @@ function ringOf(c){
      does not carry one, and `spineKeys().has(undefined)` is false for every card, which
      silently empties Ring 0 and spills all 38 spine cards into the rings behind it.
      Caught by G15 in build.mjs, which counts rings over PACK.cards directly. */
-  if(spineKeys().has(c.key||ckey(c))) return 0;
+  if(spineKeys().has(c.key||ckey(c))) return R_SPINE;
+  /* BEFORE the thin test on purpose. A card on a declared written point belongs to the
+     written half whatever else it touches — otherwise a case-study card that happens to
+     also mention a thin focus point is dealt as scarcity filler, and the round that
+     claims to hold "every card on the case studies" quietly does not. */
+  if(R_WRITTEN>=0&&onWritten(c)) return R_WRITTEN;
   const pp=perPoint();
-  if([c.crit].concat(c.alsoCrit||[]).filter(Boolean).some(id=>(pp[id]||0)<THINAT)) return 1;
-  return c.tier==='verbatim'?2:3;
+  if([c.crit].concat(c.alsoCrit||[]).filter(Boolean).some(id=>(pp[id]||0)<THINAT)) return R_THIN;
+  return c.tier==='verbatim'?R_REST:R_BG;
 }
 
 /* ---- the lock ---- */
@@ -2689,11 +3074,17 @@ function ringOpen(){
 }
 /* Which ring is actually being dealt. `S.ring` is the reader's choice and is honoured
    only as far as they have earned — except for `any`, the escape hatch: it drops
-   straight into ring 2 and the screen says out loud that the spine is not locked yet.
+   straight into ESCAPETO and the screen says out loud that the spine is not locked yet.
    ([[two-doors-pattern]] — a reduced pool must announce itself and must never be a
    hard lock.) */
 function ringNow(){
   if(!HASRINGS()) return null;
+  /* THE READER'S OWN ROUTE LEAVES THE ROUNDS ENTIRELY — it does not reorder inside
+     one. Dealing "your pick, but only the part of it that happens to sit in Round 1"
+     is the tool answering a different question from the one asked, which is the same
+     reasoning the one-point drill below is written on. Null here means buildDeck
+     falls through to the ordinary ranked queue over whatever is in scope. */
+  if(!GUIDED()) return null;
   /* DRILLING ONE FOCUS POINT LEAVES THE RINGS. A reader who taps a point in the
      blueprint has asked for that point, not for the part of it that happens to be in
      the ring they are on — tapping "Functional anatomy of the heart · 87 cards" and
@@ -2701,7 +3092,7 @@ function ringNow(){
      question from the one asked. `point` deals the whole point, in the ordinary ranked
      order, and the bar says so and offers the way back. */
   if(S.ring==='point') return null;
-  if(S.ring==='any') return 2;
+  if(S.ring==='any') return ESCAPETO;
   const open=ringOpen();
   const want=typeof S.ring==='number'?S.ring:open;
   return Math.min(want,open);
@@ -2851,6 +3242,11 @@ function spineSubHTML(t){
     const cr=(PACK.criteria||[]).find(c=>c.id===(S.filters.crits||[])[0]);
     return `Drilling <b>${esc(cr?(cr.name||cr.id):'one topic')}</b> — outside the rounds.`;
   }
+  /* NO CARD COUNT HERE. The filter bar two lines down already states the size of the
+     queue, and a second number on the same screen is the thing this bar's own notes
+     were written to keep off it — even when both are right. This line says which route
+     is running; the bar underneath owns how big it is. */
+  if(!GUIDED()) return `<b>You are choosing</b> · the rounds are paused · tap the bar for the list`;
   const n=ringNow(); if(n===null) return `${t.tot} topics · tap the bar for the list`;
   const p=ringProgress(n), r=RINGS[n];
   /* "— then Round 2 opens" only once it is nearly true. It is a promise worth making
@@ -2865,6 +3261,8 @@ const SPINEGLOSS=`<div class="spinehelp" id="spineHelp">
       <dt>Topic</dt><dd>One of the focus points the course says the test can ask about. One segment in the bar, in the order the course publishes them.</dd>
       <dt>Locked</dt><dd>You answered that topic's lead card right <b>twice</b>, in sittings an hour or more apart. Once is a half-height segment; the second one, an hour later, fills it.</dd>
       <dt>Round</dt><dd>Which pass through the deck you are on. ${RINGS.map((r,i)=>`<b>${ROUNDLAB(i)}</b> is ${esc(r.sub)}`).join('; ')}. A round opens when the one before it is fully locked — and you can always skip ahead.</dd>
+      <dt>Why this order</dt><dd><b>${ROUNDLAB(0)}</b> gives every topic one card, even the small ones, because a topic you have never answered on is a guaranteed zero if the test asks it — and the first question on a topic teaches you far more than the tenth.${
+        HASWRITTEN()?` <b>${ROUNDLAB(R_WRITTEN)}</b> is next because every written question comes from ${WRITTEN().length===1?'that case study':'those case studies'}, which is ${shareWord(SAQSHARE())} of the marks on ${WRITTEN().length} topic${WRITTEN().length===1?'':'s'}.`:''} After that it is ${LECTS} other questions, and background reading last.</dd>
     </dl>
     <button class="wlink" id="spineIntro">Show the opening explanation again →</button>
   </div>`;
@@ -3099,7 +3497,7 @@ function bgRow(types){
   return S.bg
     ? `<div class="bgrow"><span>Drawing from all <b>${all.length}</b> cards, including the <b>${bg}</b> that go back over ground the course's own questions already cover.</span>
          <button class="btn ghost" id="bgTog">− Just the ${core} the course has asked about</button></div>`
-    : `<div class="bgrow"><span>Drawing from the <b>${core}</b> cards the course has set questions on, plus the ones covering focus points no practice test touches. The other <b>${bg}</b> go back over that same ground in more general terms — they are still in the Brief and in Search.</span>
+    : `<div class="bgrow"><span>Drawing from the <b>${core}</b> cards the course has set questions on, plus the ones covering focus points no practice test touches. The other <b>${bg}</b> go back over that same ground in more general terms — they are still in ${BRIEFOK()?'the Brief and in Search':'All cards and in Search'}.</span>
          <button class="btn ghost" id="bgTog">+ Add the other ${bg} cards</button></div>`;
 }
 /* Delegated, not wired per render, for the same reason #scopeClr is: every other
@@ -3180,7 +3578,7 @@ function filterUI(cb,types){
       ${d.note?`<div class="fsub">${d.note}</div>`:''}
       <div class="chips">${d.opts.map(o=>`<button class="chip${S.filters[d.id].includes(o.id)?' on':''}" data-fx="tog" data-fd="${d.id}" data-fv="${esc(o.id)}"${o.hint?` title="${esc(o.hint)}"`:''}>${esc(o.lab)}<span class="pc">${o.n}</span></button>`).join('')}</div>
     </div>`).join('')}
-    <p class="fintro last">This narrows the <b>queue</b> only. The Brief, Search, All cards and your Progress keep counting the whole pack.</p>
+    <p class="fintro last">This narrows the <b>queue</b> only. ${BRIEFOK()?'The Brief, Search':'Search'}, All cards and your Progress keep counting the whole pack.</p>
   </div>`;
 }
 /* Delegated, every control of it, for the reason #bgTog and the old #scopeClr are:
@@ -3199,20 +3597,96 @@ document.addEventListener('click',e=>{
 /* `readyNote` lets a view describe its own "Get me ready" behaviour. The Brief
    orders the focus points rather than drawing a card queue, so the card-count note
    would be meaningless there. */
-function gate(cb,types,readyNote){
-  /* ── THE DOORS GO WHEN THE RINGS ARRIVE ──────────────────────────────────────
-     They are an ORDERING choice — "decide for me" against "I'll pick a topic" — and a
-     ringed pack has already decided: breadth across focus points first, and the ring
-     bar says so in a line. Leaving them up put two contradicting explanations of the
-     same queue on one screen, the door note announcing "all 414 cards, worked through
-     in course order" directly under a bar reading "38 left in this ring". The reader
-     has to guess which one is true, which is the failure the note itself was rewritten
-     once to fix.
+/* ── THE ROUTE ROW — the two doors, put back on a ringed pack ───────────────────
+   They were removed when the rounds arrived, on an argument that was half right: the
+   old doors were "decide the ORDER for me" against "I'll pick a topic", and a ringed
+   pack has decided the order, so leaving them up put two contradicting explanations of
+   one queue on the same screen — "all 414 cards in course order" above a bar reading
+   "38 left in this round".
 
-     The SCOPE row stays. "Rep only…" narrows which cards are in play, not what order
-     they come in, and it is orthogonal to the rings — a reader who wants only her
-     questions still gets them ring by ring. */
-  if(HASRINGS()&&readyNote===undefined) return filterUI(cb,types);
+   The mistake was deleting the CHOICE along with the contradiction. What came back is
+   the same two doors on a different axis: not which order, but WHO CHOOSES. That axis
+   cannot contradict the round line, because taking the second door leaves the rounds
+   altogether and the line says so.
+
+   Always both, always visible, from the first card. The escape hatch further down
+   waits five cards on purpose — it is an exit from something the reader has not
+   started — but this is not an exit, it is the question the tool should have asked
+   before it started dealing, and a reader who chose Guided ten seconds ago loses
+   nothing by seeing the other door greyed beside it. A choice you have to remember a
+   menu path to reverse is not a choice ([[two-doors-pattern]] rule 2). */
+function routeNote(types){
+  const P=deckStats(types);
+  /* deckNote is the note the unringed pack has always used for exactly this deck —
+     same ranking, same wording, same honesty about a narrowed queue. Reused rather
+     than rewritten, so the two can never describe the same ordering differently. */
+  return deckNote(P)+`<div class="doornote" style="border-left-color:var(--line2)">
+    The rounds are paused while you are choosing — <b>🎯 Guided</b> puts them back where
+    you left them. Everything else is unchanged: the same cards, the same set of
+    ${SESSION_N()}, and a topic still locks on two correct answers an hour apart.</div>`;
+}
+const ROUTEHELP=()=>`<div class="doorhelp">
+    <p><b>Both doors hold exactly the same cards</b>, mark them the same way and count
+    towards the same locks. The only difference is who decides what comes next.</p>
+    <p><b>🎯 Guided</b> deals the rounds. ${ROUNDLAB(0)} gives every one of the
+    ${(PACK.criteria||[]).length} topics a card, because a topic you have never answered
+    on is a guaranteed zero if the test asks it${HASWRITTEN()?`, then ${ROUNDLAB(R_WRITTEN)}
+    is ${WRITTEN().length===1?'the case study':'the case studies'} every written question
+    comes from — ${shareWord(SAQSHARE())} of the marks`:''}. It is the only route that
+    can promise you have covered the published list.</p>
+    <p><b>🗂 I'll choose</b> hands it over. Pick a topic, a question type, a focus point,
+    or the ones you keep getting wrong — with nothing picked it deals the whole pack,
+    leading with the questions ${LECT} has actually set and the ground no practice test
+    covers, then whatever you are weakest on.</p>
+    <p>Neither is a commitment. Switch as often as you like; nothing resets, and the
+    ${ROUNDLAB(0)} you have locked stays locked.</p>
+    ${PACK.sources?`<p style="border-top:1px solid var(--line);padding-top:9px;margin-top:9px"><b>Where this content comes from.</b> ${PACK.sources}</p>`:''}</div>`;
+let ROUTEWHY=false;
+function routeUI(cb,types){
+  const own=!GUIDED();
+  return `<div class="doors">
+      <button class="door ${own?'':'on'}" data-route="guided" aria-pressed="${own?'false':'true'}">🎯 Guided</button>
+      <button class="door ${own?'on':''}" data-route="own" aria-pressed="${own?'true':'false'}">🗂 I'll choose</button>
+      <button class="iconbtn${ROUTEWHY?' on':''}" data-route="why" title="What the difference is"
+        aria-expanded="${ROUTEWHY?'true':'false'}">?</button>
+    </div>
+    ${ROUTEWHY?ROUTEHELP():''}
+    ${filterUI(cb,types)}
+    ${own?routeNote(types):''}
+    ${bgRow(types)}`;
+}
+/* DELEGATED, and this is the one control in the tool that most needs to be. It is the
+   only way out of a narrowed self-directed queue and the only way back into the rounds;
+   every other post-render binding here attaches on a setTimeout that a fast tab switch
+   can beat, and a lost binding on THIS button is a lock — which the two-doors rule
+   forbids outright. */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-route]'); if(!b) return;
+  const r=b.dataset.route;
+  if(r==='why') ROUTEWHY=!ROUTEWHY;
+  else{
+    setRoute(r);
+    /* Taking the second door with nothing narrowed opens the panel that IS the
+       choosing. Without it "I'll choose" lights a button and changes the deal order
+       silently, and the reader is left looking for the thing they just asked for.
+       Only when nothing is on: a reader who already narrowed has chosen already, and
+       reopening the panel over their queue is noise. */
+    if(r==='own'&&!filtOn()) FPANEL=true;
+    if(r==='guided') FPANEL=false;
+    /* The same handler serves the first-run modal, so it owns the two surfaces the
+       choice controls: the chooser closes itself (a route now exists), and the
+       first-run panel is re-rendered so it describes the route just taken rather than
+       the other one. Both are no-ops on every later press. */
+    renderRoutePick();
+    renderOnboard();
+  }
+  nav(VIEW); window.scrollTo({top:0});
+});
+function gate(cb,types,readyNote){
+  /* The SCOPE row stays under both doors. "Rep only…" narrows which cards are in play,
+     not what order they come in — a reader who wants only past-quiz questions still
+     gets them round by round under Guided. */
+  if(HASRINGS()&&readyNote===undefined) return routeUI(cb,types);
   const P=(S.door==='ready'&&readyNote===undefined)?deckStats(types):null;
   /* The filter surface sits between the doors and the note, not after it, because
      the note now describes a deck the filters have already cut — "clear a filter
@@ -3283,6 +3757,18 @@ const HASBRIEF=()=>{
     &&PACK.criteria.some(c=>critProse(c.id).length);
   return _hasbrief;
 };
+/* HASBRIEF says the prose EXISTS. BRIEFOK says the reader can get to it — and on a
+   ringed pack they cannot, because the rings retired the tab (see the three-tabs block
+   at the bottom of this file).
+
+   Every route in has to ask the same question. It did not: the tab was hidden by one
+   test and four other things went on offering the view — the "→ Read the full
+   explanation" button under every wrong answer, the "leave" button on a finished
+   session, the cold-start landing, and ?mode=brief. Clicking the first of those on
+   hs2-test1 dropped the reader onto a retired page, which is how a reader learns to
+   distrust the rest of the buttons. One predicate, asked everywhere, and nav() as the
+   backstop for any route added later. */
+const BRIEFOK=()=>HASBRIEF()&&!HASRINGS();
 S.read=S.read||{};                 // critId -> timestamp. Additive: no migration needed.
 /* cardKey -> {g,t}: marking points you ticked, out of the total. The SRS box alone
    cannot carry this — it records how WELL you recalled something, not how many marks
@@ -3505,28 +3991,46 @@ const answeredN=()=>allCards().filter(inPool).filter(cardSeen).length;
 function ringHeadHTML(){
   if(!HASRINGS()) return '';
   if(ringNow()===null){
+    /* SELF-DIRECTED IS NOT AN ESCAPE, so it gets no escape bar. The route row above
+       already holds both doors, lit, permanently — a second "Back to the rounds"
+       button under it is the same control twice, and two of them is how they end up
+       saying different things. The one-point drill keeps its bar: it is entered from
+       Progress, three screens away, and needs to name what it narrowed to. */
+    if(S.ring!=='point') return '';
     const id=(S.filters.crits||[])[0], cr=(PACK.criteria||[]).find(c=>c.id===id);
+    /* `data-route`, not an id wired on a timeout. This is the same journey as the 🎯
+       door six lines up the page, so it goes through the same delegated handler — one
+       implementation, and no window in which the button is on screen and dead. It was
+       measurable: clicking it in the same tick as the render did nothing at all. */
     return `<div class="ringbar">
       <div class="ringsub">${cr?`Every card on <b>${esc(cr.name||cr.id)}</b>, hardest first — not just the part of it in the round you were on.`
         :'Every card in scope, outside the rounds.'}</div>
-      <div class="ringsub2"><button class="btn ghost" id="ringBack">Back to the rounds</button></div>
+      <div class="ringsub2"><button class="btn ghost" data-route="guided">Back to the rounds</button></div>
     </div>`;
   }
   const n=ringNow(), escaped=S.ring==='any'&&ringOpen()===0, left0=ringProgress(0).left;
   const skip=n===0&&!escaped&&answeredN()>=ESCAPEAFTER;
   if(!escaped&&!skip) return '';
   return `<div class="ringbar">
-      ${escaped?`<div class="ringwarn">You asked to skip ahead, so this is <b>${ROUNDLAB(2)}</b> — ${
+      ${escaped?`<div class="ringwarn">You asked to skip ahead, so this is <b>${ROUNDLAB(ESCAPETO)}</b> — ${
         ROUNDLAB(0)} is <b>not</b> locked yet. ${left0} topic${left0===1?'':'s'} still ${
         left0===1?'has a lead card':'have lead cards'} you have not locked. <button class="btn ghost" id="ringBack">Back to ${ROUNDLAB(0)}</button></div>`
-      :`<div class="ringsub2"><button class="btn ghost" id="ringAny">Skip ahead to ${ROUNDLAB(2)} →</button>
+      :`<div class="ringsub2"><button class="btn ghost" id="ringAny">Skip ahead to ${ROUNDLAB(ESCAPETO)} →</button>
          <span class="ringsub" style="display:block;margin-top:5px">${ROUNDLAB(0)} is not locked yet — you can come back to it any time.</span></div>`}
     </div>`;
 }
+/* nav('study'), NOT renderStudy(). Every one of these changes which round is being
+   dealt, and the line that names the round lives in the STICKY BAR, which renderStudy
+   does not touch — so "Back to Round 1" put the reader back in Round 1 under a header
+   still reading "Drilling Function of the cardiovascular system — outside the rounds",
+   and it stayed wrong until they answered a card or changed tabs. nav renders the view
+   and then the bar, in that order, for exactly this reason. */
 function wireRingBar(){
-  const a=$('#ringAny'); if(a&&a.addEventListener) a.onclick=()=>{ S.ring='any'; save(); renderStudy(); };
-  const b=$('#ringBack'); if(b&&b.addEventListener) b.onclick=()=>{ S.ring=0; if(S.filters.crits.length) S.filters=FILT0(); save(); renderStudy(); };
-  const n=$('#ringNext'); if(n&&n.addEventListener) n.onclick=()=>{ S.ring=ringOpen(); save(); renderStudy(); };
+  const a=$('#ringAny'); if(a&&a.addEventListener) a.onclick=()=>{ S.ring='any'; save(); nav('study'); };
+  /* The escape hatch's way back, which is NOT the same as the drill's: it has a round
+     to undo (`any`) rather than a filter, so it cannot share setRoute's branch. */
+  const b=$('#ringBack'); if(b&&b.addEventListener) b.onclick=()=>{ setRoute('guided'); S.ring=0; save(); nav('study'); };
+  const n=$('#ringNext'); if(n&&n.addEventListener) n.onclick=()=>{ S.ring=ringOpen(); save(); nav('study'); };
 }
 /* The end of a ring is a real screen, not an empty queue. It says what was locked, and
    it is the only place the next ring is offered. */
@@ -3548,9 +4052,27 @@ function renderStudy(){
      to choose a door and then read a note about deck composition — which is the right
      screen for someone who has decided to work, and the wrong one for someone deciding
      whether to. The first thing on the page should be the thing that needs no decision. */
-  const G=(HASRINGS()?'':cramCTA())+ringHeadHTML()+gate(renderStudy,ALLTYPES);
+  /* ════════ THE STOP ════════════════════════════════════════════════════════════
+     A ringed Study view is BOUNDED. It was not, and that was the worst defect in the
+     tool: a card locks on the second correct answer an hour later, so nothing locks in
+     a first sitting; buildRingDeck filters on !isLocked, so after all 38 spine cards the
+     deck rebuilt to the same 38 and dealt card one again — for ever — with every answer
+     from there reporting "still inside the hour, so this one did not count". The reader
+     was handed an unbounded loop of questions the tool itself called worthless, and
+     ringDoneHTML (the only ending) needed all 38 LOCKED, which is unreachable in an hour.
+
+     One set, then a screen that stops and says when to come back. No second tab: a
+     ringed pack's own onboarding says "one way in", and a Cram tab dealing this same
+     deck under another name would contradict it. */
+  if(HASRINGS()){
+    const s=sessState();
+    if(!s.goal) sessStart();
+    if(s.n>=s.goal&&buildDeck(ALLTYPES).length){ cramFinished(); window.scrollTo({top:0}); return; }
+  }
+  const G=(HASRINGS()?sessBar():cramCTA())+ringHeadHTML()+gate(renderStudy,ALLTYPES);
   setTimeout(wireCramCTA,0);
   setTimeout(wireRingBar,0);
+  setTimeout(wireSessBar,0);
   CUR=nextCard(ALLTYPES);
   /* With rings on, an empty deck is not an empty pool — it is a ring finished, and it
      gets a screen that says so. Only fall through to the filter dead-end below when
@@ -3606,7 +4128,13 @@ function renderStudy(){
    us the card is wrong. The type label goes — every card announces its own type in the
    next breath ("Show answer", "Reveal marking points", a set of options). */
 const REASONLEAD={
-  verbatim:  `One of ${LECTS} own exam questions`,
+  /* "past quiz question", never "exam question". The tier records where the card CAME
+     FROM — one of the lecturer's own past papers — and the reader hears the second
+     phrasing as a claim about where it is GOING, which is a promise about the paper
+     this pack has no way to keep. Everywhere else it is already said correctly ("From
+     a past quiz", "Copied out of one of her own past quizzes"); this was the one line
+     that drifted. */
+  verbatim:  `One of ${LECTS} own past quiz questions`,
   taught:    `Straight from ${LECTS} lecture material`,
   textbook:  `Background reading, written for this pack`,
   unverified:`A card whose source nobody has checked`,
@@ -3676,7 +4204,11 @@ const RATEROW=`<div class="rate">
 const studyish=()=>VIEW==='study'||VIEW==='cram';
 function afterCard(){
   if(VIEW==='cram'){ sessDone(); renderCram(); window.scrollTo({top:0}); }
-  else renderStudy();
+  /* A RINGED STUDY VIEW IS ALSO A SET, so it counts cards too. Without this line the
+     round has no end: buildRingDeck filters on !isLocked, nothing locks inside the hour,
+     so the deck rebuilds to the same cards and re-deals them for ever while every answer
+     reports "did not count". See the block over renderStudy. */
+  else { if(HASRINGS()) sessDone(); renderStudy(); }
 }
 function wireRate(c){
   $$('.rate button').forEach(b=>b.onclick=()=>{
@@ -4100,10 +4632,22 @@ function sessState(){
    precise thing this view exists to keep off the screen. The day's total is still kept
    (`n`) and still reported, but on the ending, where it reads as something done rather
    than something owed. */
+/* HOW BIG A SET IS. Twelve, except that a round of 38 taken twelve at a time leaves a
+   last set of two — and a two-card set is a worse ending than a long one, because the
+   reader reads it as the tool running out rather than as a stopping point. So a remainder
+   smaller than a third of a set is absorbed into the one before it: 38 deals 12, 12, 14.
+   Counted over the deck ACTUALLY AVAILABLE (the ring's unlocked cards under whatever
+   filters are on), never over the pack, or the promise on the pip bar is a number the
+   queue cannot deliver. */
+function setSize(){
+  const n=SESSION_N(), avail=(HASRINGS()?buildDeck(ALLTYPES):deckSource(ALLTYPES)).length;
+  if(avail<=n) return Math.max(1,avail);
+  return (avail-n)<Math.ceil(n/3) ? avail : n;
+}
 function sessStart(){
   const s=sessState();
   s.base=s.n;
-  s.goal=s.n+Math.min(SESSION_N(),Math.max(1,deckSource(ALLTYPES).length));
+  s.goal=s.n+setSize();
   save();
 }
 const sessLive=()=>{ const s=sessState(); return s.goal>s.n; };
@@ -4144,6 +4688,41 @@ function sessBar(){
    they got it right or not. Counting only correct answers turns a 12-card set into an
    unbounded one for exactly the reader who most needs it to end. */
 function sessDone(){ const s=sessState(); s.n++; save(); }
+/* ════════════ THE RETURN ═══════════════════════════════════════════════════════
+   The whole tool rests on one claim — right twice, in sittings an hour or more apart —
+   and the second sitting was left entirely to the reader to remember. There is no
+   notification, no server and no push on a page served off GitHub Pages, so the only
+   honest mechanism available is to say WHEN, on the screen they are already looking at.
+
+   A TIME, NOT A DURATION. "Come back in an hour" is a fact the reader has to convert
+   while deciding whether to bother; "come back after 6:42pm" is an instruction. It is
+   computed from the lock records, so it cannot drift from the rule it describes.
+
+   The LATEST half decides it, not the earliest: coming back when only the first card of
+   the set is eligible would lock one topic and report the rest as "did not count",
+   which is precisely the experience this exists to prevent. */
+function spineHalfReady(){
+  const sp=PACK.spine||{}; let last=0, n=0;
+  for(const id in sp){ const r=S.lock[sp[id]]; if(r&&r.n===1){ n++; if(r.t>last) last=r.t; } }
+  return n?{n:n,at:last+LOCKGAP}:null;
+}
+const clockAt=t=>new Date(t).toLocaleTimeString('en-NZ',{hour:'numeric',minute:'2-digit'}).toLowerCase().replace(/\s/g,'');
+/* The one sentence that gives a reader a reason to open this again today. Four states,
+   and three of them are not celebrations — a set that moved nothing says so
+   ([[self-explaining-ui-policy]]; Giga's rule that confetti fires only when the session
+   actually advanced something). */
+function comeBackHTML(){
+  const h=spineHalfReady(), t=spineTally();
+  if(t.locked>=t.tot) return `<p class="cbk">Every topic is locked. There is nothing left in the rounds that needs a second sitting.</p>`;
+  if(!h) return `<p class="cbk">Nothing is half-way yet — a topic reaches half when you get its first card right, and locks on a second correct answer an hour or more later. ${
+    t.locked?`You have <b>${t.locked}</b> locked.`:'Nothing is locked yet.'}</p>`;
+  const now=Date.now();
+  if(h.at<=now) return `<p class="cbk"><b>${h.n} topic${h.n===1?' is':'s are'} half-way, and the hour is already up.</b>
+    Get ${h.n===1?'it':'them'} right once more and ${h.n===1?'it locks':'they lock'} — that can be your next set, right now.</p>`;
+  return `<p class="cbk"><b>${h.n} topic${h.n===1?' is':'s are'} half-way.</b>
+    Come back after <b>${clockAt(h.at)}</b>, get ${h.n===1?'it':'them'} right once more, and ${
+    h.n===1?'it locks':`those ${h.n} lock`}.</p>`;
+}
 /* Deal the next card, pulling a typeable one forward when the session is due one.
    Costs a scan of the remaining deck only on the slots that want a typed card. */
 function cramDeal(){
@@ -4189,7 +4768,10 @@ function renderCram(){
 function wireSessBar(){
   setTimeout(()=>{
     const b=$('#sessOut');
-    if(b&&b.addEventListener) b.onclick=()=>nav(HASBRIEF()?'brief':'study');
+    /* On a ringed pack Study IS the set, so the old destination is the screen the reader
+       is trying to leave — it would re-enter the same set and read as a dead button.
+       Progress is the calm surface, and it carries the blueprint and the projected mark. */
+    if(b&&b.addEventListener) b.onclick=()=>nav(HASRINGS()?'stats':BRIEFOK()?'brief':'study');
   },0);
 }
 /* The end of a set. It has to do two things at once: stop, and not imply that stopping
@@ -4206,22 +4788,60 @@ function cramFinished(){
   /* The heading counts the SET just finished; the tally counts the day. Both were `s.n`
      before, so a second set announced "Done — 24 cards" for twelve cards of work. */
   const set=Math.max(0,s.goal-s.base);
+  /* A RINGED PACK ENDS A SET DIFFERENTLY, and the difference is the point of the screen.
+     The generic ending reports a tally and offers more; a ringed one has to deliver the
+     hour rule, because that is the only reason to come back today rather than tomorrow.
+     The closing line also changes: "Study deals from it without a limit" is exactly wrong
+     here — Study IS this set, and there is no unbounded door to send anyone through. */
+  const ringed=HASRINGS();
+  const more=ringed?(buildDeck(ALLTYPES).length):(deckSource(ALLTYPES).length);
+  /* HOW MANY OF THOSE ARE WORTH DEALING RIGHT NOW. A card whose only correct answer was
+     minutes ago cannot lock again until the hour is up, so dealing it returns "did not
+     count" — the bounded version of the loop this screen exists to end. Offering
+     "Another 12" as the primary action when every remaining card is inside its hour is
+     the tool inviting work it has already said is worthless. */
+  const useful=ringed?buildDeck(ALLTYPES).filter(function(c){
+    const r=S.lock[c.key]; return !r||r.n<1||(Date.now()-r.t)>=LOCKGAP; }).length:more;
+  const nxt=ringed?Math.min(SESSION_N(),useful||more):n;
   view.innerHTML=`<div class="sessdone">
     <h3>Done — ${set} card${set===1?'':'s'}.</h3>
-    <p>That is the set. ${dl!=null&&dl>0?`<b>${dl} day${dl===1?'':'s'}</b> until the test — one set a day from here is ${n*dl} more reps.`:''}</p>
+    <p>That is the set. ${dl!=null&&dl>0?`<b>${dl} day${dl===1?'':'s'}</b> until the test.`:''}</p>
+    ${ringed?comeBackHTML():''}
     <div class="tally">
       <div><b>${s.n}</b><span>today</span></div>
+      ${ringed?`<div><b>${spineTally().locked}</b><span>topics locked</span></div>`:''}
       ${typedN?`<div><b>${typedN}</b><span>terms typed</span></div>`:''}
     </div>
-    <p style="margin-top:16px">The rest of the pack has not gone anywhere — <b>Study</b>
-      deals from it without a limit, and <b>All cards</b> shows every one of them.</p>
+    ${ringed
+      /* RECONCILE THE TWO NUMBERS. "38 cards left" printed straight after twelve cards of
+         work reads as "you achieved nothing" — both numbers are true and the reader is
+         left to join them up. Nothing locks inside the hour, so the count cannot fall
+         yet, and the sentence has to say that rather than leave it as an apparent
+         contradiction with the half-way line above. */
+      /* WHERE those cards are has to be named correctly or not at all. `ringNow() ?? 0`
+         printed "Round 1" for a reader who had taken the second door and was nowhere
+         near the rounds — a confident sentence about a place they had left. */
+      ?(more?`<p style="margin-top:16px"><b>${more}</b> card${more===1?'':'s'} ${
+          ringNow()===null?'in what you picked':`in ${ROUNDLAB(ringNow())}`} ${more===1?'is':'are'} still unlocked${
+          more-useful>0?`, and <b>${more-useful}</b> of those you have already answered once today — ${
+            more-useful===1?'it is':'they are'} waiting out the hour, which is why the number has not dropped`:''}.
+          <b>All cards</b> shows every one of them without testing you.</p>`
+            :`<p style="margin-top:16px">Nothing is left unlocked ${
+              ringNow()===null?'in what you picked':`in ${ROUNDLAB(ringNow())}`}.</p>`)
+      :`<p style="margin-top:16px">The rest of the pack has not gone anywhere — <b>Study</b>
+        deals from it without a limit, and <b>All cards</b> shows every one of them.</p>`}
     <div class="btnrow">
-      <button class="btn primary" id="cramMore">Another ${n}</button>
-      <button class="btn ghost" id="cramStop">I'm done for now</button>
+      ${ringed&&!useful&&more
+        /* Every remaining card is inside its hour. Demoted, and labelled with what it
+           actually buys, so the reader chooses re-reading knowingly instead of being
+           steered into it by the loudest button on the screen. */
+        ?`<button class="btn ghost" id="cramMore">Read another ${nxt} anyway<small>nothing can lock until the hour is up</small></button>`
+        :more?`<button class="btn primary" id="cramMore">Another ${nxt}</button>`:''}
+      <button class="btn ${ringed&&!useful&&more?'primary':'ghost'}" id="cramStop">I'm done for now</button>
     </div></div>`;
   setTimeout(()=>{
     const m=$('#cramMore'), st=$('#cramStop');
-    if(m&&m.addEventListener) m.onclick=()=>{ sessStart(); renderCram(); window.scrollTo({top:0}); };
+    if(m&&m.addEventListener) m.onclick=()=>{ sessStart(); (ringed?renderStudy:renderCram)(); window.scrollTo({top:0}); };
     if(st&&st.addEventListener) st.onclick=()=>nav('stats');
   },0);
 }
@@ -4477,7 +5097,10 @@ function wireBlueprint(){
   $$('.bprow').forEach(b=>b.onclick=()=>{
     /* Drilling one point uses the scope the tool already has, rather than a second
        mechanism that would need its own chips, its own count and its own way out. */
-    S.filters=FILT0(); S.filters.crits=[b.dataset.crit]; S.ring='point'; save();
+    /* Tapping a point IS the second door being taken, so the route follows it —
+       otherwise the reader lands on Study with 🎯 Guided still lit above a queue that
+       is not the rounds, and the loudest thing on the screen is wrong. */
+    S.filters=FILT0(); S.filters.crits=[b.dataset.crit]; S.ring='point'; S.route='own'; save();
     nav('study'); window.scrollTo({top:0});
   });
 }
@@ -4542,7 +5165,7 @@ function renderStats(){
 }
 
 if((PACK.cards||[]).some(c=>c.tier)) $('#navAudit').hidden=false;
-if(HASBRIEF()&&!HASRINGS()) $('#navBrief').hidden=false;
+if(BRIEFOK()) $('#navBrief').hidden=false;
 /* ── THREE TABS, NOT SEVEN — for a ringed pack ────────────────────────────────
    Study, Progress, Search. The Brief goes because the rings replaced the thing it was
    for: it was the cold-start landing page, it was a third empty (derived from prose
@@ -4586,7 +5209,11 @@ if(MIGRATED_SCOPE&&S.filters.topics.length&&S.filters.crits.length&&!deckSource(
 }
 const coldStart=!Object.keys(S.srs).length&&!Object.keys(S.mcq).length;
 renderOnboard();
-nav(HASBRIEF()&&!HASRINGS()&&coldStart?'brief':'study');
+nav(BRIEFOK()&&coldStart?'brief':'study');
+/* AFTER the view, so the modal opens on top of the screen it is a decision about
+   rather than on top of nothing — and so a reader who has already chosen (every render
+   but one) pays only a null check. */
+renderRoutePick();
 </script>
 <script>
 /* ===== STUDY BUS v2 (hub ⚡ engine — see estate STUDY-ENGINE-SPEC.md) =====
