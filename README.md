@@ -646,6 +646,52 @@ it rendered only the single lowest rank present, which put **356 of 587 cards ou
 of reach entirely** and starved three topics to zero. If you change the ordering,
 test topic reach at a cold start before anything else.
 
+## Guided vs I'll choose — who picks (ringed packs only)
+
+A pack that declares `spine` deals in **rounds**, and for one release that was the only
+order the tool had. The reader was told what was about to happen and never asked. The
+only ways off it were a filter that narrows the round you are already in, and a
+blueprint row three taps deep in Progress — so a cold reader could not tell that the
+route was a decision anybody had made. **A default nobody was offered an alternative to
+is not a default, it is a rail.**
+
+So the choice is asked **once**, in a modal, and then lives permanently at the top of
+Study:
+
+| | deals | `ringNow()` |
+|---|---|---|
+| 🎯 **Guide me** (recommended) | the rounds, in order | the current round |
+| 🗂 **I'll choose** | the ordinary ranked queue over whatever is in scope | `null` |
+
+- **State is `S.route`**, `'guided'` / `'own'`, and it is deliberately **undefined until
+  the reader answers** — `ROUTEASK()` is that condition, asked by both the chooser (which
+  renders when true) and the first-run panel (which stays silent while it is). No
+  separate "have they seen it" flag to fall out of sync.
+- **One dataset, one progress model.** `own` is not a second deck and not a second
+  scoring rule: same cards, same `S.lock`, same Spine Bar, same bounded set. It changes
+  which cards come next and in what order, nothing else.
+- **`own` leaves the rounds entirely** rather than reordering inside one — being dealt
+  "your pick, but only the part of it in Round 1" answers a different question from the
+  one asked. Same reasoning as the one-point drill from Progress, which now sets
+  `S.route='own'` so the lit door matches the queue.
+- **The route buttons are delegated** (`[data-route]`), never wired per render. They are
+  the only way out of a narrowed self-directed queue and the only way back into the
+  rounds; a lost binding on them is a lock, which house policy forbids. This was
+  measured, not assumed — the old id-wired *Back to the rounds* did nothing when clicked
+  in the same tick as its render.
+- **Every number in the chooser is read off the pack** — topic count, how many lead cards
+  are `verbatim`, the written share via `SAQSHARE()`. Typed as literals they become the
+  invented-pass-mark failure again. No pack, no claim: a spine with nothing sourced
+  simply loses that clause.
+- **`hs2-test1/build.mjs` G26** asserts the reader is asked, that **both** doors render
+  under **either** route with exactly one lit, that the two routes deal different decks,
+  that nothing names a round while the rounds are paused, and that returning to Guided
+  undoes a one-topic drill. Every branch of it was proven to fire by breaking the thing
+  it guards.
+
+A pack with no `spine` never sees any of this: `GUIDED()` is true for it by
+construction, and it keeps the old **🎯 Get me ready / 🗂 I'll pick** doors unchanged.
+
 ## Duplicate cards
 
 A card's progress key is a hash of its type, its question **and a signature of its
