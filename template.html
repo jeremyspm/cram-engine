@@ -2645,9 +2645,14 @@ function renderOnboard(){
        an order they had just declined. The test facts and the meaning of "locked" are
        common to both; only the middle changes. */
     const routed=GUIDED()
-      ?`<p><b>${ROUNDLAB(0)} — one card from each of the ${nC} topics.</b> Every topic gets
-        one, even the small ones. A topic you have never answered a question on is a
-        guaranteed zero if it comes up, so this makes sure none of them is a blank.</p>
+      ?`<p><b>${ROUNDLAB(0)} — one question from each of the ${nC} topics.</b> Every topic gets
+        one, even the small ones. The job is to find the topics you would go blank on, before
+        the test does.</p>
+      <p><b>It is a sweep, not a deep dive.</b> ${nC} cards out of ${POOLN()}.${
+        (()=>{const b=BIGGEST(); return b&&b.herQuestions>20
+          ?` <b>${esc(b.name)}</b> has ${b.herQuestions} of ${LECTS} questions behind it and ${ROUNDLAB(0)} gives you one of them.`:''})()
+        } Finishing it means nothing is a total blank. It does not mean you know the
+        topic — the later rounds are where that happens.</p>
       ${wN?`<p><b>${ROUNDLAB(R_WRITTEN)} — the ${wN===1?'case study':`${wN} case studies`}.</b>
         Every written question comes from ${wN===1?'it':'them'}${share?`, so ${wN===1?'this one topic is':`these ${wN} topics are`} worth ${share} of the marks`:''}.</p>`:''}`
       :`<p><b>You are picking.</b> <b>🔎 Rep only…</b> above the card cuts the deck to a
@@ -2723,6 +2728,21 @@ function spineVerbatim(){
   const keys=new Set(Object.values(PACK.spine||{}));
   return allCards().filter(c=>keys.has(c.key)&&provOf(c)==='verbatim').length;
 }
+/* ── THE TWO NUMBERS THAT MAKE THE GUIDED DOOR HONEST ────────────────────────
+   Round 1 is a SWEEP. Every sentence the tool wrote about it was true and every one
+   described what it COVERS, so a reader could finish 38 cards, see a full bar, and
+   reasonably conclude they had covered the course. They have covered it once. These
+   two figures are what turn "one card from every topic" from a feature into a limit,
+   so they are said out loud rather than left for the reader to work out:
+
+     POOLN()   how many cards there actually are, so the spine can be seen as a fraction
+     BIGGEST() the topic with the most of her questions behind it — the one where
+               "one card" is most obviously not the same thing as knowing it
+
+   Both read off the pack. A typed number here would be the invented `pass: 65` again,
+   and it would rot the moment a card is added. */
+const POOLN=()=>allCards().filter(inPool).filter(answerable).length;
+const BIGGEST=()=>(PACK.criteria||[]).reduce((a,c)=>((c.herQuestions||0)>((a&&a.herQuestions)||0)?c:a),null);
 function routePickHTML(){
   const cfg=Object.assign({minutes:0,auto:0,saq:0},PACK.exam||{});
   const nQ=(cfg.auto||0)+(cfg.saq||0), d=examDate(), dl=daysLeft();
@@ -2743,12 +2763,14 @@ function routePickHTML(){
       <p class="rpwhen">${facts||'Two ways to work through this.'}</p>
       <button class="rpopt" id="rpGuided" data-route="guided">
         <span class="rpt">🎯 Guide me<span class="rptag">Recommended</span></span>
-        <span class="rpb">Work through it in the order this pack argues for: <b>one card from
-          each of the ${nC} topics</b> the course lists${evid} — because a topic you have
-          never answered a question on is a guaranteed zero if it comes up${
-          wN&&share?`. Then the ${wN===1?'case study':`${wN} case studies`} every written
-          question comes from, which is <b>${share} of the marks</b> sitting on ${
-          wN===1?'one topic':`${wN} topics`}`:''}.</span></button>
+        <span class="rpb"><b>Round 1 gives you one question from each of the ${nC} topics</b>
+          on the course's checklist${evid}. It finds the topics you would go blank on, before
+          the test does.<br><br>
+          <b>It is a sweep, not a deep dive.</b> That is ${nC} cards out of ${POOLN()}. Getting
+          one right does not mean you know the topic — it means it is no longer a total
+          blank.${wN&&share?` Round 2 is the ${wN===1?'case study':`${wN} case studies`}, because
+          every written question comes from ${wN===1?'it':'them'} — <b>${share} of the marks</b>.`:''}
+          The other ${POOLN()-nC} cards come after that, and that is where the depth is.</span></button>
       <button class="rpopt" id="rpOwn" data-route="own">
         <span class="rpt">🗂 I'll choose</span>
         <span class="rpb">Pick what you rep — a topic, a question type, one point off the
@@ -3387,7 +3409,11 @@ function spineSubHTML(t){
   const next=p.left&&p.left<=NEXTROUNDAT&&n<RINGS.length-1?` — then ${ROUNDLAB(n+1)} opens`:'';
   return `<b>${ROUNDLAB(n)}</b> · ${esc(r.sub)}${p.left?` · <b>${p.left}</b> to go${next}`:' · done'}`;
 }
-const SPINEGLOSS=`<div class="spinehelp" id="spineHelp">
+/* A FUNCTION, not a const literal. It quotes POOLN()/spineVerbatim(), which read
+   `allCards` — declared much further down, so evaluating this at load time threw
+   "Cannot access allCards before initialization" and the whole page died. Same TDZ
+   family as the ringsV migration note above. Built on demand; there is one call site. */
+const SPINEGLOSS=()=>`<div class="spinehelp" id="spineHelp">
     <b>The three words this tool uses.</b>
     <dl>
       <dt>Topic</dt><dd>One of the focus points the course says the test can ask about. One segment in the bar, in the order the course publishes them.</dd>
@@ -3395,6 +3421,8 @@ const SPINEGLOSS=`<div class="spinehelp" id="spineHelp">
       <dt>Round</dt><dd>Which pass through the deck you are on. ${RINGS.map((r,i)=>`<b>${ROUNDLAB(i)}</b> is ${esc(r.sub)}`).join('; ')}. A round opens when the one before it is fully locked — and you can always skip ahead.</dd>
       <dt>Why this order</dt><dd><b>${ROUNDLAB(0)}</b> gives every topic one card, even the small ones, because a topic you have never answered on is a guaranteed zero if the test asks it — and the first question on a topic teaches you far more than the tenth.${
         HASWRITTEN()?` <b>${ROUNDLAB(R_WRITTEN)}</b> is next because every written question comes from ${WRITTEN().length===1?'that case study':'those case studies'}, which is ${shareWord(SAQSHARE())} of the marks on ${WRITTEN().length} topic${WRITTEN().length===1?'':'s'}.`:''} After that it is ${LECTS} other questions, and background reading last.</dd>
+      <dt>What Guided actually reps</dt><dd><b>${ROUNDLAB(0)} is ${(PACK.criteria||[]).length} cards out of ${POOLN()}</b> — one question per topic, picked as the best-evidenced card for that topic, ${spineVerbatim()} of them questions ${LECT} has set before. It is a <b>sweep</b>: it tells you which topics you would go blank on. ${(()=>{const b=BIGGEST(); return b&&b.herQuestions>20?`<b>${esc(b.name)}</b> alone has ${b.herQuestions} of her questions behind it, and ${ROUNDLAB(0)} deals you one of them. `:''})()}So a full bar means <b>you have touched every topic twice</b>, not that you are ready — the remaining ${POOLN()-(PACK.criteria||[]).length} cards are the actual revision, and they are ${RINGS.slice(HASWRITTEN()?2:1).map((r,i)=>`<b>${ROUNDLAB(i+(HASWRITTEN()?2:1))}</b>`).join(', ')}.</dd>
+      <dt>What it does not do</dt><dd>It does not predict the paper, and it is not ranked by what is most likely to come up — nothing here can honestly promise that. It covers <b>every topic the course publishes</b>, in an order that puts the written marks early. If you already know where you are weak, <b>🗂 I'll choose</b> is the better door: same cards, same marking, you pick.</dd>
     </dl>
     <button class="wlink" id="spineIntro">Show the opening explanation again →</button>
   </div>`;
@@ -3414,7 +3442,7 @@ function renderSpine(){
      screen — and the header's copy is the one that scrolls away. The pill stands for
      every pack that has no Spine Bar. */
   const pill=$('#hDays'); if(pill&&daysLeft()!=null) pill.hidden=true;
-  open.innerHTML=(SPINEHELP?SPINEGLOSS:'')+
+  open.innerHTML=(SPINEHELP?SPINEGLOSS():'')+
     (SPINEOPEN?`<div class="spineopen">${blueprintRowsHTML()}</div>`:'');
   const b=$('#spineBar'); if(b) b.onclick=()=>{ SPINEOPEN=!SPINEOPEN; renderSpine(); };
   const q=$('#spineQ'); if(q) q.onclick=()=>{ SPINEHELP=!SPINEHELP; renderSpine(); };
